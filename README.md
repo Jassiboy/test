@@ -60,6 +60,11 @@ report = (
 )
 ```
 
+| Point | Detail |
+|-------|--------|
+| **Custom DataFrames** | You can optionally pass a pre-built DataFrame list as a third argument instead of relying on the default file reader: `.for_files(landing_path, regex, df_list)` |
+| **Regex Precision** | The more specific and robust your regex, the more accurate the file matching. Use uppercase/lowercase patterns in the regex itself to control case sensitivity. |
+
 ---
 
 ## Raising an Alert on Failure
@@ -82,5 +87,4 @@ except Exception as e:
 |-------|--------|
 | **Flexibility** | You can chain any number of check functions based on your validation requirements. |
 | **Performance Trade-off** | Each additional check consumes more compute resources. Use only the checks that are necessary for your use case. |
-| **Custom DataFrames** | In `for_files()` mode, you can optionally pass a pre-built DataFrame list as a third argument instead of relying on the default file reader. |
 | **Source Tracking** | In `for_dataframes()` mode, ensure the `_source_path_` column is present in every DataFrame so results can be traced back to the correct source. |
