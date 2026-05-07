@@ -1,0 +1,337 @@
+
+<h2 class="sr-only">Draw.io style HLD with 10 numbered blocks flowing left to right across swim lanes for data flow, DQ validation, fault tolerance, reinstatement, orchestration, and platform services.</h2>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.canvas-wrap{overflow-x:auto;overflow-y:visible;padding:0 0 12px}
+.canvas{position:relative;width:2200px;padding:16px 20px 20px}
+.lane{position:absolute;top:0;bottom:0;pointer-events:none;border-right:1px dashed var(--color-border-tertiary)}
+.lane-label{position:absolute;top:0;font-size:9px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--color-text-tertiary);white-space:nowrap;padding:3px 0 0 4px}
+.stage{position:absolute;border-radius:10px;border-width:1.5px;border-style:solid}
+.stage-title{font-size:10px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;padding:7px 10px 4px;border-bottom:1px solid;border-radius:9px 9px 0 0}
+.stage-body{padding:6px 8px 8px;display:flex;flex-direction:column;gap:5px}
+.block{border-radius:6px;border-width:1px;border-style:solid;padding:6px 8px;cursor:pointer;transition:opacity .15s}
+.block:hover{opacity:.78}
+.step-badge{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;font-size:9px;font-weight:500;margin-right:5px;flex-shrink:0;vertical-align:middle}
+.block-row{display:flex;align-items:flex-start;gap:0}
+.block-title{font-size:12px;font-weight:500;line-height:1.3;display:inline}
+.block-sub{font-size:10px;line-height:1.4;margin-top:2px}
+.conn{position:absolute;pointer-events:none}
+svg.arrows{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+
+.s-source{background:#FAECE7;border-color:#D85A30}.s-source .stage-title{background:#F0997B;color:#4A1B0C;border-color:#D85A30}.s-source .block{background:#fff;border-color:#F0997B}.s-source .step-badge{background:#D85A30;color:#fff}.s-source .block-title{color:#712B13}.s-source .block-sub{color:#993C1D}
+.s-ingest{background:#EEEDFE;border-color:#7F77DD}.s-ingest .stage-title{background:#AFA9EC;color:#26215C;border-color:#7F77DD}.s-ingest .block{background:#fff;border-color:#AFA9EC}.s-ingest .step-badge{background:#534AB7;color:#fff}.s-ingest .block-title{color:#3C3489}.s-ingest .block-sub{color:#534AB7}
+.s-bronze{background:#FAEEDA;border-color:#BA7517}.s-bronze .stage-title{background:#EF9F27;color:#412402;border-color:#BA7517}.s-bronze .block{background:#fff;border-color:#EF9F27}.s-bronze .step-badge{background:#854F0B;color:#fff}.s-bronze .block-title{color:#633806}.s-bronze .block-sub{color:#854F0B}
+.s-dq{background:#E1F5EE;border-color:#1D9E75}.s-dq .stage-title{background:#5DCAA5;color:#04342C;border-color:#1D9E75}.s-dq .block{background:#fff;border-color:#5DCAA5}.s-dq .step-badge{background:#0F6E56;color:#fff}.s-dq .block-title{color:#085041}.s-dq .block-sub{color:#0F6E56}
+.s-silver{background:#E1F5EE;border-color:#1D9E75}.s-silver .stage-title{background:#1D9E75;color:#E1F5EE;border-color:#0F6E56}.s-silver .block{background:#fff;border-color:#5DCAA5}.s-silver .step-badge{background:#085041;color:#fff}.s-silver .block-title{color:#085041}.s-silver .block-sub{color:#0F6E56}
+.s-gold{background:#EEEDFE;border-color:#534AB7}.s-gold .stage-title{background:#534AB7;color:#EEEDFE;border-color:#3C3489}.s-gold .block{background:#fff;border-color:#AFA9EC}.s-gold .step-badge{background:#3C3489;color:#fff}.s-gold .block-title{color:#26215C}.s-gold .block-sub{color:#534AB7}
+.s-consume{background:#F1EFE8;border-color:#888780}.s-consume .stage-title{background:#888780;color:#F1EFE8;border-color:#5F5E5A}.s-consume .block{background:#fff;border-color:#B4B2A9}.s-consume .step-badge{background:#5F5E5A;color:#fff}.s-consume .block-title{color:#2C2C2A}.s-consume .block-sub{color:#5F5E5A}
+.s-ft{background:#FCEBEB;border-color:#E24B4A}.s-ft .stage-title{background:#F09595;color:#501313;border-color:#E24B4A}.s-ft .block{background:#fff;border-color:#F09595}.s-ft .step-badge{background:#A32D2D;color:#fff}.s-ft .block-title{color:#791F1F}.s-ft .block-sub{color:#A32D2D}
+.s-reinstate{background:#FAEEDA;border-color:#BA7517}.s-reinstate .stage-title{background:#FAC775;color:#412402;border-color:#BA7517}.s-reinstate .block{background:#fff;border-color:#FAC775}.s-reinstate .step-badge{background:#BA7517;color:#fff}.s-reinstate .block-title{color:#633806}.s-reinstate .block-sub{color:#854F0B}
+.s-platform{background:#F1EFE8;border-color:#5F5E5A}.s-platform .stage-title{background:#D3D1C7;color:#2C2C2A;border-color:#888780}.s-platform .block{background:#fff;border-color:#D3D1C7}.s-platform .step-badge{background:#444441;color:#fff}.s-platform .block-title{color:#2C2C2A}.s-platform .block-sub{color:#5F5E5A}
+
+@media(prefers-color-scheme:dark){
+.s-source{background:#4A1B0C;border-color:#F0997B}.s-source .stage-title{background:#993C1D;color:#F5C4B3;border-color:#F0997B}.s-source .block{background:#26150A;border-color:#993C1D}.s-source .block-title{color:#F5C4B3}.s-source .block-sub{color:#F0997B}
+.s-ingest{background:#26215C;border-color:#AFA9EC}.s-ingest .stage-title{background:#534AB7;color:#CECBF6;border-color:#AFA9EC}.s-ingest .block{background:#1A1640;border-color:#534AB7}.s-ingest .block-title{color:#CECBF6}.s-ingest .block-sub{color:#AFA9EC}
+.s-bronze{background:#412402;border-color:#EF9F27}.s-bronze .stage-title{background:#854F0B;color:#FAC775;border-color:#EF9F27}.s-bronze .block{background:#2A1800;border-color:#854F0B}.s-bronze .block-title{color:#FAC775}.s-bronze .block-sub{color:#EF9F27}
+.s-dq{background:#04342C;border-color:#5DCAA5}.s-dq .stage-title{background:#0F6E56;color:#9FE1CB;border-color:#5DCAA5}.s-dq .block{background:#022018;border-color:#0F6E56}.s-dq .block-title{color:#9FE1CB}.s-dq .block-sub{color:#5DCAA5}
+.s-silver{background:#04342C;border-color:#5DCAA5}.s-silver .stage-title{background:#085041;color:#9FE1CB;border-color:#5DCAA5}.s-silver .block{background:#022018;border-color:#085041}.s-silver .block-title{color:#9FE1CB}.s-silver .block-sub{color:#5DCAA5}
+.s-gold{background:#26215C;border-color:#AFA9EC}.s-gold .stage-title{background:#3C3489;color:#CECBF6;border-color:#AFA9EC}.s-gold .block{background:#1A1640;border-color:#3C3489}.s-gold .block-title{color:#CECBF6}.s-gold .block-sub{color:#AFA9EC}
+.s-consume{background:#2C2C2A;border-color:#888780}.s-consume .stage-title{background:#444441;color:#D3D1C7;border-color:#888780}.s-consume .block{background:#1A1A18;border-color:#5F5E5A}.s-consume .block-title{color:#D3D1C7}.s-consume .block-sub{color:#B4B2A9}
+.s-ft{background:#501313;border-color:#F09595}.s-ft .stage-title{background:#A32D2D;color:#F7C1C1;border-color:#F09595}.s-ft .block{background:#300A0A;border-color:#A32D2D}.s-ft .block-title{color:#F7C1C1}.s-ft .block-sub{color:#F09595}
+.s-reinstate{background:#412402;border-color:#FAC775}.s-reinstate .stage-title{background:#633806;color:#FAC775;border-color:#FAC775}.s-reinstate .block{background:#2A1800;border-color:#633806}.s-reinstate .block-title{color:#FAC775}.s-reinstate .block-sub{color:#EF9F27}
+.s-platform{background:#2C2C2A;border-color:#888780}.s-platform .stage-title{background:#2C2C2A;color:#D3D1C7;border-color:#5F5E5A}.s-platform .block{background:#1A1A18;border-color:#5F5E5A}.s-platform .block-title{color:#D3D1C7}.s-platform .block-sub{color:#B4B2A9}
+}
+
+.legend{display:flex;flex-wrap:wrap;gap:10px 20px;padding:10px 20px 4px;font-size:11px;color:var(--color-text-secondary)}
+.legend-item{display:flex;align-items:center;gap:5px}
+.legend-dot{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+</style>
+
+<div class="canvas-wrap">
+<div class="canvas" style="height:740px">
+
+<svg class="arrows" viewBox="0 0 2200 740" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+<path d="M1 1L9 5L1 9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+</defs>
+<g opacity=".45" stroke="currentColor" stroke-width="1.2" fill="none">
+<line x1="221" y1="175" x2="259" y2="175" marker-end="url(#ah)"/>
+<line x1="461" y1="175" x2="499" y2="175" marker-end="url(#ah)"/>
+<line x1="701" y1="175" x2="739" y2="175" marker-end="url(#ah)"/>
+<line x1="941" y1="175" x2="979" y2="175" marker-end="url(#ah)"/>
+<line x1="1181" y1="175" x2="1219" y2="175" marker-end="url(#ah)"/>
+<line x1="1421" y1="175" x2="1459" y2="175" marker-end="url(#ah)"/>
+<line x1="1661" y1="175" x2="1699" y2="175" marker-end="url(#ah)"/>
+<line x1="1901" y1="175" x2="1939" y2="175" marker-end="url(#ah)"/>
+<line x1="2141" y1="175" x2="2159" y2="175" marker-end="url(#ah)"/>
+</g>
+<g opacity=".25" stroke="#A32D2D" stroke-width="1" stroke-dasharray="5 3" fill="none">
+<path d="M340 390 L340 440 L100 440 L100 390"/>
+<path d="M580 390 L580 440 L340 440"/>
+<path d="M820 390 L820 440 L580 440"/>
+<path d="M1060 390 L1060 440 L820 440"/>
+<text></text>
+</g>
+<g opacity=".2" stroke="#854F0B" stroke-width="1" stroke-dasharray="4 3" fill="none">
+<path d="M340 530 L340 570 L580 570 L580 530"/>
+<path d="M820 530 L820 570 L580 570"/>
+</g>
+</svg>
+
+<div class="stage s-source" style="left:20px;top:44px;width:220px;min-height:260px" onclick="sendPrompt('Describe Oracle source extraction — CDC watermark strategy, JDBC connection, daily vs monthly extraction modes')">
+<div class="stage-title">Source system</div>
+<div class="stage-body">
+<div class="block s-source">
+<div class="block-row"><span class="step-badge">1</span><span class="block-title">Oracle DB (on-prem)</span></div>
+<div class="block-sub">FXD · FXI · FXG · FXF · TNT</div>
+</div>
+<div class="block s-source" onclick="sendPrompt('How does the CDC watermark work per table — updated_at high watermark for daily, full snapshot for monthly')">
+<div class="block-row"><span class="step-badge">1a</span><span class="block-title">CDC watermark</span></div>
+<div class="block-sub">updated_at per table</div>
+<div class="block-sub">Full snapshot — monthly</div>
+</div>
+<div class="block s-source" onclick="sendPrompt('What source-level validation runs before extraction begins — row count check, schema snapshot comparison')">
+<div class="block-row"><span class="step-badge">1b</span><span class="block-title">Source validation</span></div>
+<div class="block-sub">Row count · schema snap</div>
+</div>
+</div>
+</div>
+
+<div class="stage s-ingest" style="left:260px;top:44px;width:220px;min-height:260px" onclick="sendPrompt('Explain the ingestion adapter — ADF on Azure, Cloud Dataflow on GCP, Spark JDBC connector abstraction')">
+<div class="stage-title">Ingestion layer</div>
+<div class="stage-body">
+<div class="block s-ingest">
+<div class="block-row"><span class="step-badge">2</span><span class="block-title">Ingestion adapter</span></div>
+<div class="block-sub">ADF (Azure) · Dataflow (GCP)</div>
+</div>
+<div class="block s-ingest" onclick="sendPrompt('How does the pipeline control table drive config-driven ingestion across all 20+ domain tables')">
+<div class="block-row"><span class="step-badge">2a</span><span class="block-title">Pipeline control table</span></div>
+<div class="block-sub">Config-driven · 1 row/table</div>
+<div class="block-sub">Watermark per (domain, freq)</div>
+</div>
+<div class="block s-ingest" onclick="sendPrompt('What does the staging-promote pattern guarantee and how does it prevent partial Bronze writes')">
+<div class="block-row"><span class="step-badge">2b</span><span class="block-title">Staging → promote</span></div>
+<div class="block-sub">Atomic rename on success</div>
+</div>
+</div>
+</div>
+
+<div class="stage s-bronze" style="left:500px;top:44px;width:220px;min-height:260px" onclick="sendPrompt('Describe Bronze zone — append-only, Delta+Parquet, domain/freq/table/date partition keys, 90-day retention, reinstatement anchor')">
+<div class="stage-title">Bronze — raw zone</div>
+<div class="stage-body">
+<div class="block s-bronze">
+<div class="block-row"><span class="step-badge">3</span><span class="block-title">Bronze (ADLS / GCS)</span></div>
+<div class="block-sub">Append-only · Delta + Parquet</div>
+<div class="block-sub">domain/freq/table/date</div>
+</div>
+<div class="block s-bronze" onclick="sendPrompt('What are the Bronze partition key design decisions and why is this partition scheme chosen')">
+<div class="block-row"><span class="step-badge">3a</span><span class="block-title">Partition design</span></div>
+<div class="block-sub">Hive-style · predicate pushdown</div>
+<div class="block-sub">90-day retention · never deleted</div>
+</div>
+<div class="block s-bronze" onclick="sendPrompt('Why is Bronze the reinstatement anchor and how does Delta time-travel enable point-in-time recovery')">
+<div class="block-row"><span class="step-badge">3b</span><span class="block-title">Reinstatement anchor</span></div>
+<div class="block-sub">Delta time-travel · ACID</div>
+</div>
+</div>
+</div>
+
+<div class="stage s-dq" style="left:740px;top:44px;width:220px;min-height:260px" onclick="sendPrompt('Explain DQ gate 1 between Bronze and Silver — what Great Expectations suite checks run and what happens on failure')">
+<div class="stage-title">DQ gate 1</div>
+<div class="stage-body">
+<div class="block s-dq">
+<div class="block-row"><span class="step-badge">4</span><span class="block-title">Great Expectations suite</span></div>
+<div class="block-sub">Schema · null rate · row count</div>
+</div>
+<div class="block s-dq" onclick="sendPrompt('How does the quarantine path work — where are failing rows written and how are they tracked for investigation')">
+<div class="block-row"><span class="step-badge">4a</span><span class="block-title">Quarantine path</span></div>
+<div class="block-sub">Bad rows → quarantine store</div>
+<div class="block-sub">Pipeline halts on threshold</div>
+</div>
+<div class="block s-dq" onclick="sendPrompt('What dedup and PK uniqueness checks run at DQ gate 1')">
+<div class="block-row"><span class="step-badge">4b</span><span class="block-title">Dedup + PK checks</span></div>
+<div class="block-sub">Unique keys · no nulls on PK</div>
+</div>
+</div>
+</div>
+
+<div class="stage s-silver" style="left:980px;top:44px;width:220px;min-height:260px" onclick="sendPrompt('Describe Silver zone — typed schema, SCD2, MERGE idempotency, PII masking, 1-year retention')">
+<div class="stage-title">Silver — cleansed zone</div>
+<div class="stage-body">
+<div class="block s-silver">
+<div class="block-row"><span class="step-badge">5</span><span class="block-title">Silver (ADLS / GCS)</span></div>
+<div class="block-sub">Typed · SCD2 · MERGE</div>
+<div class="block-sub">PII masked · 1-year retain</div>
+</div>
+<div class="block s-silver" onclick="sendPrompt('How does DQ gate 2 between Silver and Account layer work — business rule validation, completeness checks')">
+<div class="block-row"><span class="step-badge">5a</span><span class="block-title">DQ gate 2</span></div>
+<div class="block-sub">Biz rules · completeness</div>
+<div class="block-sub">Halts Gold on fail</div>
+</div>
+<div class="block s-silver" onclick="sendPrompt('How does schema evolution work in Silver when Oracle source columns change')">
+<div class="block-row"><span class="step-badge">5b</span><span class="block-title">Schema evolution</span></div>
+<div class="block-sub">Delta schema merge mode</div>
+</div>
+</div>
+</div>
+
+<div class="stage s-gold" style="left:1220px;top:44px;width:220px;min-height:310px" onclick="sendPrompt('Explain the Gold transformation tiers — Account, Facility, Country, Global — and how table count parity is maintained across all layers')">
+<div class="stage-title">Gold — aggregation tiers</div>
+<div class="stage-body">
+<div class="block s-gold">
+<div class="block-row"><span class="step-badge">6</span><span class="block-title">Account layer</span></div>
+<div class="block-sub">Per domain+table · MERGE</div>
+</div>
+<div class="block s-gold" onclick="sendPrompt('How does the Facility roll-up aggregate from Account — what SQL, what join keys, how is table count parity maintained')">
+<div class="block-row"><span class="step-badge">6a</span><span class="block-title">Facility layer</span></div>
+<div class="block-sub">Roll-up · ALL_SUCCESS gate</div>
+</div>
+<div class="block s-gold" onclick="sendPrompt('How does the Country roll-up work and how is identical table structure enforced across all four layers')">
+<div class="block-row"><span class="step-badge">6b</span><span class="block-title">Country layer</span></div>
+<div class="block-sub">Roll-up from facility</div>
+</div>
+<div class="block s-gold" onclick="sendPrompt('How does the Global layer consolidate from Country and what does the final output structure look like')">
+<div class="block-row"><span class="step-badge">6c</span><span class="block-title">Global layer</span></div>
+<div class="block-sub">Final consolidation · 7yr retain</div>
+</div>
+</div>
+</div>
+
+<div class="stage s-dq" style="left:1460px;top:44px;width:220px;min-height:260px" onclick="sendPrompt('Explain DQ gate 3 between Gold and Consumption — cross-layer consistency, aggregation total validation, row count parity across domains')">
+<div class="stage-title">DQ gate 3</div>
+<div class="stage-body">
+<div class="block s-dq">
+<div class="block-row"><span class="step-badge">7</span><span class="block-title">Cross-layer consistency</span></div>
+<div class="block-sub">Agg totals · count parity</div>
+</div>
+<div class="block s-dq" onclick="sendPrompt('What happens when DQ gate 3 fails — how are consumers blocked and how is the Gold partition quarantined')">
+<div class="block-row"><span class="step-badge">7a</span><span class="block-title">Consumer block</span></div>
+<div class="block-sub">Block Synapse/BQ on fail</div>
+<div class="block-sub">Alert + drop Gold partition</div>
+</div>
+<div class="block s-dq" onclick="sendPrompt('What domain-level row count checks run at gate 3 — how are FXD/FXI/FXG/FXF/TNT parity validated')">
+<div class="block-row"><span class="step-badge">7b</span><span class="block-title">Domain parity check</span></div>
+<div class="block-sub">Per-domain row count match</div>
+</div>
+</div>
+</div>
+
+<div class="stage s-consume" style="left:1700px;top:44px;width:220px;min-height:260px" onclick="sendPrompt('Describe the Consumption zone — Synapse external tables on Azure, BigQuery external tables on GCP, row-level security, no data copy')">
+<div class="stage-title">Consumption zone</div>
+<div class="stage-body">
+<div class="block s-consume">
+<div class="block-row"><span class="step-badge">8</span><span class="block-title">Synapse / BigQuery</span></div>
+<div class="block-sub">External tables · no copy</div>
+</div>
+<div class="block s-consume" onclick="sendPrompt('How is row-level security applied in the Consumption zone per consumer and per domain')">
+<div class="block-row"><span class="step-badge">8a</span><span class="block-title">Row-level security</span></div>
+<div class="block-sub">Per-consumer views · RBAC</div>
+</div>
+<div class="block s-consume" onclick="sendPrompt('How are BI tools, APIs, and downstream systems connected to the Consumption zone')">
+<div class="block-row"><span class="step-badge">8b</span><span class="block-title">BI · API · exports</span></div>
+<div class="block-sub">Power BI · REST · extract</div>
+</div>
+</div>
+</div>
+
+<div class="stage s-platform" style="left:1940px;top:44px;width:220px;min-height:260px" onclick="sendPrompt('Explain the cloud adapter pattern — how CLOUD_PROVIDER env var switches between Azure and GCP service implementations')">
+<div class="stage-title">Platform &amp; portability</div>
+<div class="stage-body">
+<div class="block s-platform">
+<div class="block-row"><span class="step-badge">9</span><span class="block-title">Cloud adapter</span></div>
+<div class="block-sub">CLOUD_PROVIDER=azure|gcp</div>
+</div>
+<div class="block s-platform" onclick="sendPrompt('What CI/CD pipeline is used — Terraform for infra, GitHub Actions for jobs and DAGs, staging parity')">
+<div class="block-row"><span class="step-badge">9a</span><span class="block-title">CI/CD · Terraform</span></div>
+<div class="block-sub">Dev → staging → prod</div>
+</div>
+<div class="block s-platform" onclick="sendPrompt('How are costs optimised — spot instances, storage tiering, Delta VACUUM cadence, Z-order on Gold')">
+<div class="block-row"><span class="step-badge">9b</span><span class="block-title">Cost + performance</span></div>
+<div class="block-sub">Spot · Z-order · OPTIMIZE</div>
+</div>
+</div>
+</div>
+
+<div class="stage s-ft" style="left:20px;top:364px;width:1140px;min-height:150px">
+<div class="stage-title">Fault tolerance &amp; recovery — all stages</div>
+<div class="stage-body" style="flex-direction:row;flex-wrap:wrap;gap:6px">
+<div class="block s-ft" style="width:205px" onclick="sendPrompt('Source fault tolerance — retry 3x, circuit breaker, Oracle timeout handling and watermark preservation')">
+<div class="block-row"><span class="step-badge">FT1</span><span class="block-title">Source</span></div>
+<div class="block-sub">Retry 3× · circuit breaker</div>
+</div>
+<div class="block s-ft" style="width:205px" onclick="sendPrompt('Ingestion fault tolerance — staging-promote pattern, failed write leaves Bronze unchanged, re-run from watermark')">
+<div class="block-row"><span class="step-badge">FT2</span><span class="block-title">Ingest</span></div>
+<div class="block-sub">Staging → promote · ACID</div>
+</div>
+<div class="block s-ft" style="width:205px" onclick="sendPrompt('Bronze fault tolerance — Delta ACID means failed write leaves Bronze unchanged, staging path cleaned on retry')">
+<div class="block-row"><span class="step-badge">FT3</span><span class="block-title">Bronze</span></div>
+<div class="block-sub">No partial write · Delta ACID</div>
+</div>
+<div class="block s-ft" style="width:205px" onclick="sendPrompt('Silver fault tolerance — Delta ACID rollback on Spark failure, downstream layers blocked by ExternalTaskSensor')">
+<div class="block-row"><span class="step-badge">FT4</span><span class="block-title">Silver / DQ</span></div>
+<div class="block-sub">ACID rollback · sensor block</div>
+</div>
+<div class="block s-ft" style="width:205px" onclick="sendPrompt('Gold fault tolerance — per-tier ACID rollback, ALL_SUCCESS blocks next tier, partial aggregation impossible')">
+<div class="block-row"><span class="step-badge">FT5</span><span class="block-title">Gold tiers</span></div>
+<div class="block-sub">Per-tier ACID · no partial agg</div>
+</div>
+</div>
+</div>
+
+<div class="stage s-reinstate" style="left:500px;top:524px;width:700px;min-height:140px">
+<div class="stage-title">Reinstatement workflow — Bronze is the permanent anchor</div>
+<div class="stage-body" style="flex-direction:row;flex-wrap:wrap;gap:6px">
+<div class="block s-reinstate" style="width:205px" onclick="sendPrompt('What does Bronze-as-anchor mean — why it is never deleted and how any downstream zone can be rebuilt from it')">
+<div class="block-row"><span class="step-badge">R1</span><span class="block-title">Bronze anchor</span></div>
+<div class="block-sub">Never deleted · time-travel</div>
+</div>
+<div class="block s-reinstate" style="width:205px" onclick="sendPrompt('How do you reinstate Silver — drop Silver partitions for date range, re-trigger Airflow DAG from Bronze')">
+<div class="block-row"><span class="step-badge">R2</span><span class="block-title">Silver reinstate</span></div>
+<div class="block-sub">Drop partition → re-trigger DAG</div>
+</div>
+<div class="block s-reinstate" style="width:205px" onclick="sendPrompt('How do you reinstate Gold — drop Gold partitions, Bronze and Silver unchanged, re-trigger transformation DAG')">
+<div class="block-row"><span class="step-badge">R3</span><span class="block-title">Gold reinstate</span></div>
+<div class="block-sub">Drop Gold → re-run transform</div>
+</div>
+</div>
+</div>
+
+<div class="stage s-platform" style="left:1220px;top:364px;width:940px;min-height:150px">
+<div class="stage-title">Orchestration · metadata · observability — all stages</div>
+<div class="stage-body" style="flex-direction:row;flex-wrap:wrap;gap:6px">
+<div class="block s-platform" style="width:210px" onclick="sendPrompt('How does Airflow orchestrate the pipeline — DAG structure, TriggerRule.ALL_SUCCESS, ExternalTaskSensor between tiers')">
+<div class="block-row"><span class="step-badge">P1</span><span class="block-title">Airflow DAGs</span></div>
+<div class="block-sub">ALL_SUCCESS · cron schedule</div>
+</div>
+<div class="block s-platform" style="width:210px" onclick="sendPrompt('How does OpenLineage track column-level lineage from Oracle through all four Gold transformation layers')">
+<div class="block-row"><span class="step-badge">P2</span><span class="block-title">OpenLineage · Unity Catalog</span></div>
+<div class="block-sub">Column lineage · table ACL</div>
+</div>
+<div class="block s-platform" style="width:210px" onclick="sendPrompt('How does OpenTelemetry instrument the pipeline and what metrics are routed to Grafana and PagerDuty')">
+<div class="block-row"><span class="step-badge">P3</span><span class="block-title">OTel → Grafana · alerts</span></div>
+<div class="block-sub">Latency · row count · SLA</div>
+</div>
+<div class="block s-platform" style="width:210px" onclick="sendPrompt('How is the run_metadata table structured and how is it used for incident triage')">
+<div class="block-row"><span class="step-badge">P4</span><span class="block-title">Run metadata table</span></div>
+<div class="block-sub">Per-run audit · watermark log</div>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+<div class="legend">
+<div class="legend-item"><div class="legend-dot" style="background:#F0997B;border:1px solid #993C1D"></div>Source (step 1)</div>
+<div class="legend-item"><div class="legend-dot" style="background:#AFA9EC;border:1px solid #534AB7"></div>Ingestion (step 2)</div>
+<div class="legend-item"><div class="legend-dot" style="background:#EF9F27;border:1px solid #854F0B"></div>Bronze (step 3)</div>
+<div class="legend-item"><div class="legend-dot" style="background:#5DCAA5;border:1px solid #0F6E56"></div>DQ gates (steps 4, 7)</div>
+<div class="legend-item"><div class="legend-dot" style="background:#1D9E75;border:1px solid #085041"></div>Silver (step 5)</div>
+<div class="legend-item"><div class="legend-dot" style="background:#AFA9EC;border:1px solid #3C3489"></div>Gold tiers (step 6)</div>
+<div class="legend-item"><div class="legend-dot" style="background:#888780;border:1px solid #5F5E5A"></div>Consumption + platform (steps 8–9)</div>
+<div class="legend-item"><div class="legend-dot" style="background:#F09595;border:1px solid #A32D2D"></div>Fault tolerance (FT1–FT5)</div>
+<div class="legend-item"><div class="legend-dot" style="background:#FAC775;border:1px dashed #BA7517"></div>Reinstatement (R1–R3)</div>
+<div class="legend-item"><div class="legend-dot" style="background:#D3D1C7;border:1px solid #888780"></div>Orchestration / observability (P1–P4)</div>
+</div>
