@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2024-01-01T00:00:00.000Z" agent="draw.io" version="21.0.0">
+  <diagram name="Architecture Diagram" id="arch-main">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ============================================================ -->
+        <!-- TITLE: CURRENT ARCHITECTURE FLOW                             -->
+        <!-- ============================================================ -->
+        <mxCell id="title1" value="Current Architecture Flow" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#1a1a2e;" vertex="1" parent="1">
+          <mxGeometry x="200" y="30" width="900" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- NOT IN SCOPE LABEL                                           -->
+        <!-- ============================================================ -->
+        <mxCell id="not_in_scope_label" value="Not in Scope" style="text;html=1;strokeColor=none;fillColor=#fff2cc;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=12;fontStyle=2;fontColor=#7d6608;arcSize=20;" vertex="1" parent="1">
+          <mxGeometry x="280" y="80" width="130" height="36" as="geometry" />
+        </mxCell>
+
+        <!-- Curly brace / bracket indicator for Not in Scope covering EIW + Interm Layer -->
+        <mxCell id="not_scope_bracket" value="" style="shape=bracket;whiteSpace=wrap;html=1;strokeColor=#c7950a;fillColor=none;direction=south;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="118" width="430" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- EIW BOX (Source)                                             -->
+        <!-- ============================================================ -->
+        <mxCell id="eiw_container" value="EIW" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;verticalAlign=top;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="100" y="150" width="110" height="90" as="geometry" />
+        </mxCell>
+        <!-- Database cylinder inside EIW -->
+        <mxCell id="eiw_db" value="" style="shape=mxgraph.cisco.storage.standard_disk;fillColor=#6c8ebf;strokeColor=#23445d;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="130" y="180" width="50" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- SAS SCRIPTS ARROW LABEL                                      -->
+        <!-- ============================================================ -->
+        <mxCell id="sas_arrow" value="SAS Scripts" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;fontColor=#4a4a4a;" vertex="1" connectable="0" parent="1">
+          <mxGeometry x="240" y="195" width="90" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- INTERMEDIARY LAYER CONTAINER                                 -->
+        <!-- ============================================================ -->
+        <mxCell id="interm_layer_container" value="Intermediary Layer" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=12;fontStyle=1;rounded=1;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="310" y="140" width="190" height="110" as="geometry" />
+        </mxCell>
+        <!-- DM Tables on MKVW inside Intermediary Layer -->
+        <mxCell id="dm_tables" value="DM Tables&#xa;on MKVW" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;fontStyle=1;" vertex="1" parent="interm_layer_container">
+          <mxGeometry x="30" y="40" width="130" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- ORACLE SIP (Transform/ETL Step)                              -->
+        <!-- ============================================================ -->
+        <mxCell id="oracle_sip" value="Oracle&#xa;SIP" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;size=20;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="555" y="162" width="100" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- FINAL LAYER CONTAINER                                        -->
+        <!-- ============================================================ -->
+        <mxCell id="final_layer_container" value="Final Layer" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;fontSize=12;fontStyle=1;rounded=1;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="715" y="140" width="180" height="120" as="geometry" />
+        </mxCell>
+        <!-- Entity Layers inside Final Layer -->
+        <mxCell id="entity_layers" value="Entity&#xa;Layers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" vertex="1" parent="final_layer_container">
+          <mxGeometry x="20" y="35" width="140" height="35" as="geometry" />
+        </mxCell>
+        <!-- ACCT-GLBL inside Final Layer -->
+        <mxCell id="acct_glbl" value="ACCT-GLBL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;fontStyle=1;" vertex="1" parent="final_layer_container">
+          <mxGeometry x="20" y="76" width="140" height="34" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- FIP CONTAINER                                                -->
+        <!-- ============================================================ -->
+        <mxCell id="fip_container" value="FIP" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#4a235a;fontSize=13;fontStyle=1;rounded=1;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="970" y="130" width="160" height="140" as="geometry" />
+        </mxCell>
+        <!-- DM box inside FIP -->
+        <mxCell id="fip_dm" value="DM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="fip_container">
+          <mxGeometry x="30" y="38" width="100" height="35" as="geometry" />
+        </mxCell>
+        <!-- Arrow inside FIP from DM to Entity -->
+        <mxCell id="fip_inner_arrow" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="fip_dm" target="fip_entity" parent="fip_container">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- Entity box inside FIP -->
+        <mxCell id="fip_entity" value="Entity" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;fontStyle=1;" vertex="1" parent="fip_container">
+          <mxGeometry x="30" y="92" width="100" height="35" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- CONNECTIONS / ARROWS                                        -->
+        <!-- ============================================================ -->
+
+        <!-- EIW → Intermediary Layer (DM Tables) with "SAS Scripts" label -->
+        <mxCell id="arrow_eiw_to_interm" value="SAS Scripts" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#4a4a4a;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=#ffffff;fontSize=11;fontStyle=1;" edge="1" source="eiw_container" target="dm_tables" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Intermediary Layer → Oracle SIP -->
+        <mxCell id="arrow_interm_to_oracle" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#4a4a4a;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="interm_layer_container" target="oracle_sip" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Oracle SIP → Final Layer (Entity Layers) -->
+        <mxCell id="arrow_oracle_to_final" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#4a4a4a;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="oracle_sip" target="final_layer_container" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Final Layer → FIP with "Pull" label (curved arrow) -->
+        <mxCell id="arrow_final_to_fip" value="Pull" style="edgeStyle=elbowEdgeStyle;elbow=vertical;html=1;strokeColor=#9673a6;strokeWidth=2.5;exitX=1;exitY=0;exitDx=0;exitDy=30;entryX=0;entryY=0.5;entryDx=0;entryDy=0;curved=1;labelBackgroundColor=#e1d5e7;fontSize=12;fontStyle=1;fontColor=#4a235a;" edge="1" source="final_layer_container" target="fip_container" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="930" y="170" />
+              <mxPoint x="930" y="200" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- SECTION DIVIDER                                              -->
+        <!-- ============================================================ -->
+        <mxCell id="divider" value="" style="line;strokeWidth=2;fillColor=none;strokeColor=#cccccc;" vertex="1" parent="1">
+          <mxGeometry x="80" y="300" width="1100" height="10" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- TITLE: 2 APPROACHES                                         -->
+        <!-- ============================================================ -->
+        <mxCell id="title_approaches" value="2 Approaches for Migration" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#1a1a2e;" vertex="1" parent="1">
+          <mxGeometry x="80" y="318" width="320" height="36" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- APPROACH 1: End to End Development GCP                      -->
+        <!-- ============================================================ -->
+        <mxCell id="approach1_label" value="① Approach 1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=13;fontStyle=1;fontColor=#1a6494;" vertex="1" parent="1">
+          <mxGeometry x="80" y="368" width="160" height="28" as="geometry" />
+        </mxCell>
+
+        <mxCell id="approach1_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="80" y="400" width="1100" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- Wavy line (represented as a path note) inside Approach 1 -->
+        <mxCell id="approach1_wave" value="" style="shape=mxgraph.arrows2.arrow;fillColor=#6c8ebf;strokeColor=#23445d;direction=east;dy=0.6;dx=40;notch=0;opacity=30;" vertex="1" parent="1">
+          <mxGeometry x="100" y="418" width="1060" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="approach1_text" value="End to End Development on GCP" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=18;fontStyle=1;fontColor=#1a3a5c;" vertex="1" parent="1">
+          <mxGeometry x="80" y="438" width="1100" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- APPROACH 2: Phased Migration                                -->
+        <!-- ============================================================ -->
+        <mxCell id="approach2_label" value="② Approach 2" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=13;fontStyle=1;fontColor=#7b2d8b;" vertex="1" parent="1">
+          <mxGeometry x="80" y="510" width="160" height="28" as="geometry" />
+        </mxCell>
+
+        <mxCell id="approach2_outer" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#9673a6;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="80" y="542" width="1100" height="110" as="geometry" />
+        </mxCell>
+
+        <!-- Wavy line inside Approach 2 -->
+        <mxCell id="approach2_wave" value="" style="shape=mxgraph.arrows2.arrow;fillColor=#9673a6;strokeColor=#4a235a;direction=east;dy=0.6;dx=40;notch=0;opacity=25;" vertex="1" parent="1">
+          <mxGeometry x="100" y="553" width="1060" height="18" as="geometry" />
+        </mxCell>
+
+        <!-- Phase I box inside Approach 2 -->
+        <mxCell id="phase1_box" value="Phase – I&#xa;(Cloud Agnostic &amp; Plug &amp; Play&#xa;till GCP come)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="480" y="562" width="680" height="78" as="geometry" />
+        </mxCell>
+
+        <!-- Phase II box inside Approach 2 -->
+        <mxCell id="phase2_box" value="Phase – II&#xa;(Once GCP comes)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontStyle=1;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="100" y="562" width="350" height="78" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow from Phase I to Phase II -->
+        <mxCell id="arrow_phase1_to_phase2" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#7b2d8b;strokeWidth=2.5;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;" edge="1" source="phase1_box" target="phase2_box" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- LEGEND                                                       -->
+        <!-- ============================================================ -->
+        <mxCell id="legend_container" value="Legend" style="swimlane;startSize=28;fillColor=#f5f5f5;strokeColor=#aaaaaa;fontStyle=1;fontSize=12;rounded=1;arcSize=4;" vertex="1" parent="1">
+          <mxGeometry x="80" y="690" width="480" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg1" value="Source System (EIW)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="legend_container">
+          <mxGeometry x="15" y="36" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" value="Intermediary / Transform" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="legend_container">
+          <mxGeometry x="15" y="72" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" value="Final / Target Layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="legend_container">
+          <mxGeometry x="190" y="36" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" value="Cloud Platform (FIP / GCP)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="legend_container">
+          <mxGeometry x="190" y="72" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5" value="Not in Scope" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#c7950a;fontSize=10;fontStyle=2;" vertex="1" parent="legend_container">
+          <mxGeometry x="360" y="36" width="100" height="30" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
