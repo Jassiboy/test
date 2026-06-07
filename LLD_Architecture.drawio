@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxGraphModel dx="2000" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="3000" math="0" shadow="1">
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TITLE -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <mxCell id="title" value="GCP Data Pipeline Migration — Low-Level Design (LLD)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=24;fontStyle=1;fontColor=#1A56A0;" vertex="1" parent="1">
+      <mxGeometry x="200" y="20" width="1800" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="subtitle" value="Config Tables  |  Log Tables  |  Reinstatement Logic  |  Orchestration  |  DQ Framework  |  Schema Registry" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=13;fontColor=#555;" vertex="1" parent="1">
+      <mxGeometry x="200" y="60" width="1800" height="25" as="geometry"/>
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- SECTION A: bq_metadata DATASET — ALL CONTROL TABLES           -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <mxCell id="meta_band" value="A.  bq_metadata  Dataset — Configuration, Log, Audit &amp; Control Tables" style="rounded=1;arcSize=2;fillColor=#E8EAF6;strokeColor=#3949AB;strokeWidth=3;fontSize=14;fontStyle=1;fontColor=#1A237E;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="50" y="105" width="2100" height="790" as="geometry"/>
+    </mxCell>
+
+    <!-- ─── TABLE 1: pipeline_config ─────────────────────────────── -->
+    <mxCell id="cfg_hdr" value="TABLE: pipeline_config  (WHERE: bq_metadata dataset)&#xa;Purpose: Master pipeline configuration — controls every run behaviour" style="rounded=1;fillColor=#3949AB;strokeColor=#1A237E;fontColor=#fff;fontSize=11;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="70" y="135" width="480" height="55" as="geometry"/>
+    </mxCell>
+    <mxCell id="cfg_col1" value="config_key  STRING  PK&#xa;config_value  STRING&#xa;description  STRING&#xa;data_type  STRING&#xa;layer  STRING  (bronze/silver/gold/all)&#xa;is_active  BOOL&#xa;created_at  TIMESTAMP&#xa;updated_at  TIMESTAMP&#xa;updated_by  STRING" style="rounded=1;fillColor=#E8EAF6;strokeColor=#3949AB;fontSize=10;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="70" y="195" width="220" height="185" as="geometry"/>
+    </mxCell>
+    <mxCell id="cfg_vals" value="Sample Rows:&#xa;──────────────────────────────&#xa;ingestion_batch_size = 500000&#xa;dq_tier1_halt = true&#xa;watermark_col = updated_at&#xa;late_arrival_window_hrs = 2&#xa;max_retry_count = 3&#xa;retry_backoff_mins = 5&#xa;archive_retention_days = 365&#xa;partition_expiry_bronze = 365&#xa;partition_expiry_silver = 730&#xa;enable_cdc = true&#xa;cdc_tables = src_t1,src_t2" style="rounded=1;fillColor=#f0f0ff;strokeColor=#3949AB;fontSize=9;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="300" y="195" width="245" height="185" as="geometry"/>
+    </mxCell>
+
+    <!-- ─── TABLE 2: table_config ─────────────────────────────────── -->
+    <mxCell id="tcfg_hdr" value="TABLE: table_config  (WHERE: bq_metadata dataset)&#xa;Purpose: Per-table settings — ingestion mode, watermark, partitioning" style="rounded=1;fillColor=#3949AB;strokeColor=#1A237E;fontColor=#fff;fontSize=11;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="580" y="135" width="480" height="55" as="geometry"/>
+    </mxCell>
+    <mxCell id="tcfg_cols" value="table_id  STRING  PK&#xa;source_system  STRING&#xa;source_table_name  STRING&#xa;target_dataset  STRING&#xa;target_table_name  STRING&#xa;layer  STRING&#xa;ingestion_mode  STRING  (FULL/INCR/CDC)&#xa;watermark_column  STRING&#xa;watermark_type  STRING  (timestamp/int)&#xa;partition_col  STRING&#xa;cluster_cols  STRING  (comma-sep)&#xa;sla_hours  INT64&#xa;depends_on  STRING  (table_id list)&#xa;is_active  BOOL&#xa;created_at  TIMESTAMP&#xa;updated_at  TIMESTAMP" style="rounded=1;fillColor=#E8EAF6;strokeColor=#3949AB;fontSize=10;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="580" y="195" width="245" height="305" as="geometry"/>
+    </mxCell>
+    <mxCell id="tcfg_note" value="KEY DESIGN NOTES:&#xa;──────────────────────────────────&#xa;• ingestion_mode drives DAG branching:&#xa;  FULL  → truncate + reload&#xa;  INCR  → watermark merge&#xa;  CDC   → Datastream apply&#xa;&#xa;• depends_on enforces layer order:&#xa;  global_t1 depends_on acct_t1,dim_t1&#xa;  facility_t1 depends_on global_t1..4&#xa;  country_t1 depends_on facility_t1..4&#xa;&#xa;• sla_hours triggers Airflow SLA miss&#xa;  callback → alert on breach&#xa;&#xa;• WHERE TO CREATE: BigQuery dataset&#xa;  bq_metadata, table name table_config&#xa;  Populated via Terraform + seed script" style="rounded=1;fillColor=#fffde7;strokeColor=#f9a825;fontSize=9;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="835" y="195" width="220" height="305" as="geometry"/>
+    </mxCell>
+
+    <!-- ─── TABLE 3: pipeline_runs (LOG TABLE) ──────────────────── -->
+    <mxCell id="runs_hdr" value="TABLE: pipeline_runs  (WHERE: bq_metadata dataset)  ← PRIMARY LOG TABLE&#xa;Purpose: Every task execution recorded here — source of truth for audit, retry, and reinstatement" style="rounded=1;fillColor=#B71C1C;strokeColor=#7B0000;fontColor=#fff;fontSize=11;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="1090" y="135" width="600" height="55" as="geometry"/>
+    </mxCell>
+    <mxCell id="runs_cols" value="run_id  STRING  PK  (UUID = dag_id+exec_date SHA256)&#xa;dag_run_date  DATE  (logical processing date)&#xa;dag_id  STRING&#xa;task_id  STRING&#xa;layer  STRING&#xa;table_name  STRING&#xa;status  STRING  (RUNNING/SUCCESS/FAILED/SKIPPED/HALTED)&#xa;attempt_number  INT64  (1,2,3 on retry)&#xa;rows_read  INT64&#xa;rows_written  INT64&#xa;rows_rejected  INT64  (DQ failures)&#xa;rows_merged  INT64&#xa;rows_inserted  INT64&#xa;rows_updated  INT64&#xa;rows_deleted  INT64&#xa;watermark_start  STRING&#xa;watermark_end  STRING&#xa;started_at  TIMESTAMP&#xa;completed_at  TIMESTAMP&#xa;duration_seconds  FLOAT64&#xa;bq_job_id  STRING  (BigQuery job reference)&#xa;dataflow_job_id  STRING&#xa;error_code  STRING&#xa;error_message  STRING  (full stack trace)&#xa;rerun_triggered_by  STRING  (manual/auto/schedule)&#xa;parent_run_id  STRING  (original run on retry)&#xa;created_at  TIMESTAMP  DEFAULT CURRENT_TIMESTAMP()" style="rounded=1;fillColor=#FFEBEE;strokeColor=#B71C1C;fontSize=9;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="1090" y="195" width="360" height="400" as="geometry"/>
+    </mxCell>
+    <mxCell id="runs_note" value="PARTITION: dag_run_date (DATE)&#xa;CLUSTER: layer, table_name, status&#xa;&#xa;KEY QUERIES:&#xa;──────────────────────────&#xa;-- Last successful watermark:&#xa;SELECT watermark_end FROM pipeline_runs&#xa;WHERE table_name = 'src_table_1'&#xa;  AND status = 'SUCCESS'&#xa;ORDER BY dag_run_date DESC LIMIT 1;&#xa;&#xa;-- Failed runs to reinstate:&#xa;SELECT * FROM pipeline_runs&#xa;WHERE status IN ('FAILED','HALTED')&#xa;  AND dag_run_date = DATE_SUB(&#xa;    CURRENT_DATE(), INTERVAL 1 DAY);&#xa;&#xa;-- Retry count check:&#xa;SELECT COUNT(*) FROM pipeline_runs&#xa;WHERE parent_run_id = '&lt;orig_run_id&gt;'" style="rounded=1;fillColor=#fffde7;strokeColor=#f9a825;fontSize=9;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="1460" y="195" width="225" height="300" as="geometry"/>
+    </mxCell>
+
+    <!-- ─── TABLE 4: dq_results ───────────────────────────────────── -->
+    <mxCell id="dq_hdr" value="TABLE: dq_results  (WHERE: bq_metadata dataset)&#xa;Purpose: Data Quality check results per rule per run" style="rounded=1;fillColor=#1B5E20;strokeColor=#003300;fontColor=#fff;fontSize=11;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="70" y="415" width="480" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="dq_cols" value="dq_run_id  STRING  PK&#xa;run_id  STRING  FK → pipeline_runs&#xa;dag_run_date  DATE&#xa;layer  STRING&#xa;table_name  STRING&#xa;rule_id  STRING&#xa;rule_name  STRING&#xa;rule_type  STRING  (null_check/range/ref_int/count/hash)&#xa;tier  INT64  (1=Critical,2=Warning,3=Info)&#xa;column_name  STRING&#xa;expected_value  STRING&#xa;actual_value  STRING&#xa;records_checked  INT64&#xa;records_failed  INT64&#xa;failure_rate  FLOAT64&#xa;result  STRING  (PASS/FAIL/WARN)&#xa;action_taken  STRING  (HALT/CONTINUE/LOG)&#xa;checked_at  TIMESTAMP" style="rounded=1;fillColor=#E8F5E9;strokeColor=#1B5E20;fontSize=9;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="70" y="470" width="280" height="290" as="geometry"/>
+    </mxCell>
+    <mxCell id="dq_rules_note" value="DQ RULES STORED IN:&#xa;gs://[proj]-config/dq-rules/&#xa;├── bronze_rules.yaml&#xa;├── silver_account_rules.yaml&#xa;├── silver_global_rules.yaml&#xa;├── gold_facility_rules.yaml&#xa;└── gold_country_rules.yaml&#xa;&#xa;Rule YAML format:&#xa;──────────────────&#xa;- rule_id: ACCT_001&#xa;  rule_name: acct_id_not_null&#xa;  table: acct_table_1&#xa;  column: account_id&#xa;  rule_type: null_check&#xa;  tier: 1&#xa;  threshold_pct: 0&#xa;  action: HALT&#xa;&#xa;- rule_id: ACCT_002&#xa;  rule_name: amount_range&#xa;  column: transaction_amount&#xa;  rule_type: range&#xa;  min_val: 0&#xa;  max_val: 999999999&#xa;  tier: 2&#xa;  action: CONTINUE" style="rounded=1;fillColor=#fffde7;strokeColor=#f9a825;fontSize=9;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="360" y="470" width="195" height="290" as="geometry"/>
+    </mxCell>
+
+    <!-- ─── TABLE 5: reconciliation ──────────────────────────────── -->
+    <mxCell id="recon_hdr" value="TABLE: reconciliation  (WHERE: bq_metadata dataset)&#xa;Purpose: Layer-by-layer row count &amp; sum reconciliation" style="rounded=1;fillColor=#4A148C;strokeColor=#2D0082;fontColor=#fff;fontSize=11;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="580" y="540" width="480" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="recon_cols" value="recon_id  STRING  PK&#xa;run_id  STRING  FK → pipeline_runs&#xa;dag_run_date  DATE&#xa;source_layer  STRING&#xa;target_layer  STRING&#xa;table_name  STRING&#xa;source_row_count  INT64&#xa;target_row_count  INT64&#xa;count_variance  INT64&#xa;count_variance_pct  FLOAT64&#xa;source_sum_amount  NUMERIC&#xa;target_sum_amount  NUMERIC&#xa;sum_variance  NUMERIC&#xa;reconciliation_status  STRING (PASS/FAIL)&#xa;checked_at  TIMESTAMP" style="rounded=1;fillColor=#EDE7F6;strokeColor=#4A148C;fontSize=9;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="580" y="595" width="265" height="250" as="geometry"/>
+    </mxCell>
+
+    <!-- ─── TABLE 6: quarantine ──────────────────────────────────── -->
+    <mxCell id="quar_hdr" value="TABLE: quarantine  (WHERE: bq_metadata dataset)&#xa;Purpose: Records failing DQ Tier-1 checks held for investigation" style="rounded=1;fillColor=#E65100;strokeColor=#BF360C;fontColor=#fff;fontSize=11;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="580" y="415" width="480" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="quar_cols" value="quarantine_id  STRING  PK&#xa;run_id  STRING  FK → pipeline_runs&#xa;dag_run_date  DATE&#xa;source_table  STRING&#xa;target_table  STRING&#xa;business_key  STRING&#xa;raw_record  JSON  (full rejected record)&#xa;dq_rule_id  STRING  FK → dq_results&#xa;failure_reason  STRING&#xa;is_resolved  BOOL  DEFAULT FALSE&#xa;resolution_action  STRING  (FIXED/DISCARDED/RELOADED)&#xa;resolved_at  TIMESTAMP&#xa;resolved_by  STRING&#xa;quarantined_at  TIMESTAMP" style="rounded=1;fillColor=#FBE9E7;strokeColor=#E65100;fontSize=9;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="580" y="470" width="260" height="240" as="geometry"/>
+    </mxCell>
+
+    <!-- ─── TABLE 7: schema_version ──────────────────────────────── -->
+    <mxCell id="schema_hdr" value="TABLE: schema_version  (WHERE: bq_metadata dataset)&#xa;Purpose: Schema evolution tracking — version history per table" style="rounded=1;fillColor=#006064;strokeColor=#004D40;fontColor=#fff;fontSize=11;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="70" y="785" width="480" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="schema_cols" value="schema_id  STRING  PK&#xa;table_name  STRING&#xa;version  INT64&#xa;schema_gcs_path  STRING&#xa;change_type  STRING  (ADD_COL/DROP_COL/TYPE_CHANGE/RENAME)&#xa;change_description  STRING&#xa;is_breaking_change  BOOL&#xa;approved_by  STRING&#xa;applied_at  TIMESTAMP&#xa;applied_by  STRING&#xa;rollback_version  INT64&#xa;is_current  BOOL" style="rounded=1;fillColor=#E0F2F1;strokeColor=#006064;fontSize=9;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="70" y="840" width="250" height="210" as="geometry"/>
+    </mxCell>
+
+    <!-- ─── TABLE 8: lineage ─────────────────────────────────────── -->
+    <mxCell id="lin_hdr" value="TABLE: lineage  (WHERE: bq_metadata dataset)&#xa;Purpose: Custom data lineage — source to target per run" style="rounded=1;fillColor=#37474F;strokeColor=#102027;fontColor=#fff;fontSize=11;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="580" y="785" width="480" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="lin_cols" value="lineage_id  STRING  PK&#xa;run_id  STRING  FK&#xa;dag_run_date  DATE&#xa;source_dataset  STRING&#xa;source_table  STRING&#xa;target_dataset  STRING&#xa;target_table  STRING&#xa;transformation_type  STRING  (MERGE/APPEND/AGGREGATE)&#xa;transformation_sql_hash  STRING  (SHA256 of SQL)&#xa;rows_written  INT64&#xa;created_at  TIMESTAMP" style="rounded=1;fillColor=#ECEFF1;strokeColor=#37474F;fontSize=9;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="580" y="840" width="260" height="210" as="geometry"/>
+    </mxCell>
+
+    <!-- ─── TABLE 9: alert_log ───────────────────────────────────── -->
+    <mxCell id="alert_hdr" value="TABLE: alert_log  (WHERE: bq_metadata dataset)&#xa;Purpose: All pipeline alerts — DQ failures, SLA breaches, job failures" style="rounded=1;fillColor=#880E4F;strokeColor=#560027;fontColor=#fff;fontSize=11;fontStyle=1;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="1090" y="635" width="600" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="alert_cols" value="alert_id  STRING  PK&#xa;run_id  STRING  FK → pipeline_runs&#xa;alert_type  STRING  (DQ_FAIL/SLA_BREACH/JOB_FAIL/RECON_FAIL)&#xa;severity  STRING  (P1_CRITICAL/P2_HIGH/P3_WARNING/P4_INFO)&#xa;layer  STRING&#xa;table_name  STRING&#xa;message  STRING&#xa;notified_via  STRING  (pagerduty/email/slack)&#xa;notified_at  TIMESTAMP&#xa;is_acknowledged  BOOL&#xa;acknowledged_by  STRING&#xa;acknowledged_at  TIMESTAMP&#xa;resolution_notes  STRING&#xa;created_at  TIMESTAMP" style="rounded=1;fillColor=#FCE4EC;strokeColor=#880E4F;fontSize=9;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="1090" y="690" width="290" height="245" as="geometry"/>
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- SECTION B: REINSTATEMENT / RERUN LOGIC                        -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <mxCell id="reinstate_band" value="B.  Reinstatement &amp; Rerun Logic  (WHERE: Cloud Composer DAG + BQ Stored Procedure)" style="rounded=1;arcSize=2;fillColor=#FFF8E1;strokeColor=#F57F17;strokeWidth=3;fontSize=14;fontStyle=1;fontColor=#E65100;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="50" y="915" width="2100" height="640" as="geometry"/>
+    </mxCell>
+
+    <!-- Reinstatement Flow -->
+    <mxCell id="r_detect" value="1. DETECT FAILURE&#xa;Airflow on_failure_callback&#xa;OR manual trigger&#xa;OR monitoring alert" style="rounded=1;fillColor=#FFCC80;strokeColor=#E65100;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="70" y="950" width="170" height="80" as="geometry"/>
+    </mxCell>
+    <mxCell id="r_query" value="2. QUERY pipeline_runs&#xa;Find failed run_id,&#xa;layer, table_name,&#xa;watermark_start" style="rounded=1;fillColor=#FFCC80;strokeColor=#E65100;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="280" y="950" width="160" height="80" as="geometry"/>
+    </mxCell>
+    <mxCell id="r_check" value="3. CHECK attempt_number&#xa;IF attempts &lt; max_retry&#xa;→ AUTO RETRY&#xa;IF attempts = max_retry&#xa;→ MANUAL REVIEW" style="rounded=1;fillColor=#FFCC80;strokeColor=#E65100;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="480" y="950" width="170" height="80" as="geometry"/>
+    </mxCell>
+    <mxCell id="r_clean" value="4. CLEANUP&#xa;DELETE partial writes&#xa;from target partition&#xa;(idempotent prep)" style="rounded=1;fillColor=#FFCC80;strokeColor=#E65100;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="690" y="950" width="160" height="80" as="geometry"/>
+    </mxCell>
+    <mxCell id="r_rerun" value="5. RERUN TASK&#xa;Use same watermark_start&#xa;New run_id generated&#xa;parent_run_id = orig" style="rounded=1;fillColor=#FFCC80;strokeColor=#E65100;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="890" y="950" width="160" height="80" as="geometry"/>
+    </mxCell>
+    <mxCell id="r_log" value="6. LOG RESULT&#xa;Write to pipeline_runs&#xa;status=SUCCESS/FAILED&#xa;attempt_number++" style="rounded=1;fillColor=#FFCC80;strokeColor=#E65100;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1090" y="950" width="160" height="80" as="geometry"/>
+    </mxCell>
+    <mxCell id="r_downstream" value="7. RESUME DOWNSTREAM&#xa;Airflow clears blocked&#xa;downstream tasks&#xa;Pipeline continues" style="rounded=1;fillColor=#A5D6A7;strokeColor=#1B5E20;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1290" y="950" width="160" height="80" as="geometry"/>
+    </mxCell>
+    <mxCell id="r_halt" value="HALT PATH&#xa;After max retries:&#xa;Alert P1 → PagerDuty&#xa;Insert to alert_log&#xa;Manual intervention&#xa;required" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="480" y="1070" width="165" height="90" as="geometry"/>
+    </mxCell>
+
+    <!-- arrows for reinstatement flow -->
+    <mxCell id="arr_r12" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=2;" edge="1" source="r_detect" target="r_query" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr_r23" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=2;" edge="1" source="r_query" target="r_check" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr_r34" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=2;" edge="1" source="r_check" target="r_clean" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint as="sourcePoint"/><Array as="points"><mxPoint x="565" y="1010"/><mxPoint x="770" y="1010"/></Array></mxGeometry></mxCell>
+    <mxCell id="arr_r45" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=2;" edge="1" source="r_clean" target="r_rerun" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr_r56" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=2;" edge="1" source="r_rerun" target="r_log" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr_r67" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;strokeWidth=2;" edge="1" source="r_log" target="r_downstream" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="arr_r_halt" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#B71C1C;strokeWidth=2;dashed=1;" edge="1" source="r_check" target="r_halt" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+    <!-- Reinstatement BQ SP -->
+    <mxCell id="sp_box" value="BigQuery Stored Procedure: sp_reinstate_pipeline&#xa;────────────────────────────────────────────────────────────────&#xa;CALL bq_metadata.sp_reinstate_pipeline(&#xa;  p_dag_run_date  DATE,           -- e.g. '2026-06-05'&#xa;  p_layer         STRING,         -- e.g. 'silver_account'&#xa;  p_table_name    STRING,         -- e.g. 'acct_table_1' or 'ALL'&#xa;  p_triggered_by  STRING          -- 'manual' or 'auto'&#xa;);&#xa;&#xa;LOGIC:&#xa;  1. Fetch failed run_id from pipeline_runs for given date+layer+table&#xa;  2. Validate attempt_number &lt; max_retry_count (from pipeline_config)&#xa;  3. DELETE partition in target table: WHERE processing_date = p_dag_run_date&#xa;  4. INSERT new record in pipeline_runs (status=RUNNING, attempt_number+1)&#xa;  5. Return new run_id to Airflow → Airflow triggers appropriate DAG task&#xa;  6. On task complete: UPDATE pipeline_runs SET status=SUCCESS/FAILED" style="rounded=1;fillColor=#FFFDE7;strokeColor=#F57F17;fontSize=9;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="70" y="1190" width="700" height="215" as="geometry"/>
+    </mxCell>
+
+    <!-- Backfill reinstatement -->
+    <mxCell id="backfill_box" value="BACKFILL / DATE-RANGE REINSTATEMENT&#xa;────────────────────────────────────────────&#xa;Airflow DAG: backfill_pipeline_dag.py&#xa;&#xa;Parameters:&#xa;  start_date: '2026-05-01'&#xa;  end_date:   '2026-05-31'&#xa;  layer:      'ALL' or specific layer&#xa;  table:      'ALL' or specific table&#xa;&#xa;Logic:&#xa;  FOR each_date IN date_range:&#xa;    IF pipeline_runs status != SUCCESS:&#xa;      CALL sp_reinstate_pipeline(each_date, layer, table)&#xa;      WAIT for task complete&#xa;    ELSE:&#xa;      SKIP (idempotent — already succeeded)&#xa;&#xa;Safety:&#xa;  • Max 7 concurrent date reruns&#xa;  • Respects layer dependency order&#xa;  • Writes to same audit tables" style="rounded=1;fillColor=#E8F5E9;strokeColor=#1B5E20;fontSize=9;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="800" y="1190" width="380" height="215" as="geometry"/>
+    </mxCell>
+
+    <!-- Partial layer reinstatement -->
+    <mxCell id="partial_box" value="PARTIAL LAYER REINSTATEMENT RULES&#xa;────────────────────────────────────────&#xa;Country FAILED → Only rerun Country&#xa;  (Facility already SUCCESS — skip)&#xa;&#xa;Facility FAILED → Rerun Facility + Country&#xa;  (Global SUCCESS — skip)&#xa;&#xa;Global FAILED → Rerun Global + Facility + Country&#xa;&#xa;Account FAILED → Rerun Account + all downstream&#xa;&#xa;Bronze FAILED → Rerun ALL layers&#xa;&#xa;Rule enforced via depends_on in table_config:&#xa;  Airflow reads dependencies and triggers&#xa;  only the required downstream tasks,&#xa;  skipping already-successful ones." style="rounded=1;fillColor=#E3F2FD;strokeColor=#1565C0;fontSize=9;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="1210" y="1190" width="380" height="215" as="geometry"/>
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- SECTION C: ORCHESTRATION DETAIL — COMPOSER DAG FLOW          -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <mxCell id="orch_band" value="C.  Cloud Composer 2 Orchestration — DAG Task Flow &amp; Dependency Map" style="rounded=1;arcSize=2;fillColor=#E8EAF6;strokeColor=#283593;strokeWidth=3;fontSize=14;fontStyle=1;fontColor=#1A237E;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="50" y="1575" width="2100" height="490" as="geometry"/>
+    </mxCell>
+
+    <!-- DAG tasks chain -->
+    <mxCell id="t_trigger" value="trigger_run&#xa;(Sensor/Schedule)&#xa;02:00 UTC daily" style="rounded=1;fillColor=#CFD8DC;strokeColor=#455A64;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="70" y="1620" width="130" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_cfg" value="load_config&#xa;Read pipeline_config&#xa;&amp; table_config" style="rounded=1;fillColor=#E8EAF6;strokeColor=#3949AB;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="230" y="1620" width="130" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_ingest" value="ingest_bronze&#xa;Dataflow Flex Template&#xa;Batch + CDC apply" style="rounded=1;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="390" y="1620" width="130" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_dq_b" value="dq_bronze&#xa;Tier1+2+3 checks&#xa;HALT on Tier1 fail" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="550" y="1620" width="130" height="60" as="geometry"/>
+    </mxCell>
+
+    <!-- account tasks parallel -->
+    <mxCell id="t_acc1" value="transform_acct_t1" style="rounded=1;fillColor=#C8E6C9;strokeColor=#1B5E20;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="720" y="1595" width="130" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_acc2" value="transform_acct_t2" style="rounded=1;fillColor=#C8E6C9;strokeColor=#1B5E20;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="720" y="1650" width="130" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_acc3" value="transform_acct_t3" style="rounded=1;fillColor=#C8E6C9;strokeColor=#1B5E20;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="720" y="1705" width="130" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_acc4" value="transform_acct_t4" style="rounded=1;fillColor=#C8E6C9;strokeColor=#1B5E20;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="720" y="1760" width="130" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_dq_a" value="dq_account&#xa;Recon + checks" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="880" y="1670" width="120" height="60" as="geometry"/>
+    </mxCell>
+
+    <!-- global tasks parallel -->
+    <mxCell id="t_glb1" value="transform_global_t1" style="rounded=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="1035" y="1595" width="130" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_glb2" value="transform_global_t2" style="rounded=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="1035" y="1650" width="130" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_glb3" value="transform_global_t3" style="rounded=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="1035" y="1705" width="130" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_glb4" value="transform_global_t4" style="rounded=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="1035" y="1760" width="130" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_dq_g" value="dq_global&#xa;Recon + checks" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1195" y="1670" width="120" height="60" as="geometry"/>
+    </mxCell>
+
+    <!-- facility tasks parallel -->
+    <mxCell id="t_fac1" value="agg_facility_t1" style="rounded=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="1345" y="1595" width="120" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_fac2" value="agg_facility_t2" style="rounded=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="1345" y="1650" width="120" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_fac3" value="agg_facility_t3" style="rounded=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="1345" y="1705" width="120" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_fac4" value="agg_facility_t4" style="rounded=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="1345" y="1760" width="120" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_dq_f" value="dq_facility&#xa;Recon + rollup" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1495" y="1670" width="115" height="60" as="geometry"/>
+    </mxCell>
+
+    <!-- country tasks parallel -->
+    <mxCell id="t_cty1" value="rollup_country_t1" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="1640" y="1595" width="120" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_cty2" value="rollup_country_t2" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="1640" y="1650" width="120" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_cty3" value="rollup_country_t3" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="1640" y="1705" width="120" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_cty4" value="rollup_country_t4" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=9;" vertex="1" parent="1">
+      <mxGeometry x="1640" y="1760" width="120" height="45" as="geometry"/>
+    </mxCell>
+    <mxCell id="t_dq_c" value="dq_country&#xa;Final recon" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1790" y="1670" width="110" height="60" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="t_complete" value="pipeline_complete&#xa;Publish Pub/Sub event&#xa;Send summary email" style="rounded=1;fillColor=#A5D6A7;strokeColor=#1B5E20;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="1930" y="1650" width="140" height="60" as="geometry"/>
+    </mxCell>
+
+    <!-- orchestration arrows -->
+    <mxCell id="oa1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#455A64;strokeWidth=1.5;" edge="1" source="t_trigger" target="t_cfg" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#455A64;strokeWidth=1.5;" edge="1" source="t_cfg" target="t_ingest" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa3" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#455A64;strokeWidth=1.5;" edge="1" source="t_ingest" target="t_dq_b" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa4a" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;strokeWidth=1.5;" edge="1" source="t_dq_b" target="t_acc1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa4b" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;strokeWidth=1.5;" edge="1" source="t_dq_b" target="t_acc2" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa4c" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;strokeWidth=1.5;" edge="1" source="t_dq_b" target="t_acc3" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa4d" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;strokeWidth=1.5;" edge="1" source="t_dq_b" target="t_acc4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa5a" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;strokeWidth=1;" edge="1" source="t_acc1" target="t_dq_a" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa5b" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;strokeWidth=1;" edge="1" source="t_acc2" target="t_dq_a" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa5c" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;strokeWidth=1;" edge="1" source="t_acc3" target="t_dq_a" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa5d" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;strokeWidth=1;" edge="1" source="t_acc4" target="t_dq_a" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa6a" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1565C0;strokeWidth=1.5;" edge="1" source="t_dq_a" target="t_glb1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa6b" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1565C0;strokeWidth=1.5;" edge="1" source="t_dq_a" target="t_glb2" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa6c" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1565C0;strokeWidth=1.5;" edge="1" source="t_dq_a" target="t_glb3" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa6d" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1565C0;strokeWidth=1.5;" edge="1" source="t_dq_a" target="t_glb4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa7a" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1565C0;strokeWidth=1;" edge="1" source="t_glb1" target="t_dq_g" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa7b" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1565C0;strokeWidth=1;" edge="1" source="t_glb2" target="t_dq_g" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa7c" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1565C0;strokeWidth=1;" edge="1" source="t_glb3" target="t_dq_g" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa7d" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1565C0;strokeWidth=1;" edge="1" source="t_glb4" target="t_dq_g" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa8a" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=1.5;" edge="1" source="t_dq_g" target="t_fac1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa8b" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=1.5;" edge="1" source="t_dq_g" target="t_fac2" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa8c" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=1.5;" edge="1" source="t_dq_g" target="t_fac3" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa8d" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=1.5;" edge="1" source="t_dq_g" target="t_fac4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa9a" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=1;" edge="1" source="t_fac1" target="t_dq_f" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa9b" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=1;" edge="1" source="t_fac2" target="t_dq_f" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa9c" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=1;" edge="1" source="t_fac3" target="t_dq_f" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa9d" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=1;" edge="1" source="t_fac4" target="t_dq_f" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa10a" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#B71C1C;strokeWidth=1.5;" edge="1" source="t_dq_f" target="t_cty1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa10b" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#B71C1C;strokeWidth=1.5;" edge="1" source="t_dq_f" target="t_cty2" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa10c" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#B71C1C;strokeWidth=1.5;" edge="1" source="t_dq_f" target="t_cty3" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa10d" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#B71C1C;strokeWidth=1.5;" edge="1" source="t_dq_f" target="t_cty4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa11a" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#B71C1C;strokeWidth=1;" edge="1" source="t_cty1" target="t_dq_c" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa11b" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#B71C1C;strokeWidth=1;" edge="1" source="t_cty2" target="t_dq_c" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa11c" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#B71C1C;strokeWidth=1;" edge="1" source="t_cty3" target="t_dq_c" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa11d" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#B71C1C;strokeWidth=1;" edge="1" source="t_cty4" target="t_dq_c" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="oa12" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;strokeWidth=2;" edge="1" source="t_dq_c" target="t_complete" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- SECTION D: SCHEMA REGISTRY + WATERMARK STRATEGY              -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <mxCell id="schema_band" value="D.  Schema Registry &amp; Watermark Checkpoint Strategy" style="rounded=1;arcSize=2;fillColor=#E0F2F1;strokeColor=#00695C;strokeWidth=3;fontSize=14;fontStyle=1;fontColor=#004D40;verticalAlign=top;" vertex="1" parent="1">
+      <mxGeometry x="50" y="2080" width="2100" height="350" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="schema_flow" value="SCHEMA REGISTRY FLOW&#xa;──────────────────────────────&#xa;Dev adds new column to src_table_1&#xa;         │&#xa;         ▼&#xa;New schema file created:&#xa;gs://config/schema-registry/&#xa;  src_table_1/v2/schema.avsc&#xa;         │&#xa;         ▼&#xa;CI/CD runs schema_migration.py:&#xa;  IF is_breaking_change = FALSE:&#xa;    BQ ALTER TABLE ADD COLUMN&#xa;    UPDATE schema_version SET is_current=FALSE (v1)&#xa;    INSERT schema_version (v2, is_current=TRUE)&#xa;  ELSE:&#xa;    Require manual approval gate&#xa;    Create migration DAG for backfill&#xa;         │&#xa;         ▼&#xa;Dataflow Flex Template updated&#xa;to read new schema version" style="rounded=1;fillColor=#E0F7FA;strokeColor=#00695C;fontSize=9;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="70" y="2115" width="380" height="290" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="watermark_flow" value="WATERMARK CHECKPOINT STRATEGY&#xa;──────────────────────────────────────&#xa;TABLE: pipeline_runs stores per-run watermarks&#xa;&#xa;Before each run:&#xa;  SELECT watermark_end&#xa;  FROM pipeline_runs&#xa;  WHERE table_name = 'src_table_1'&#xa;    AND status = 'SUCCESS'&#xa;  ORDER BY dag_run_date DESC LIMIT 1;&#xa;  → Returns: '2026-06-04T23:59:59Z'&#xa;&#xa;Dataflow job reads:&#xa;  WHERE updated_at &gt; '2026-06-04T23:59:59Z'&#xa;    AND updated_at &lt;= CURRENT_TIMESTAMP()&#xa;&#xa;After successful run:&#xa;  UPDATE pipeline_runs&#xa;  SET watermark_end = CURRENT_TIMESTAMP(),&#xa;      status = 'SUCCESS'&#xa;  WHERE run_id = current_run_id;&#xa;&#xa;FAILURE RECOVERY:&#xa;  Rerun uses same watermark_start&#xa;  (never advances watermark on failure)" style="rounded=1;fillColor=#E8F5E9;strokeColor=#1B5E20;fontSize=9;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="490" y="2115" width="400" height="290" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="where_guide" value="WHERE TO CREATE EACH TABLE — QUICK REFERENCE&#xa;────────────────────────────────────────────────────────────────────────────&#xa;TABLE                  DATASET           PARTITION         CLUSTER             PURPOSE&#xa;──────────────────────────────────────────────────────────────────────────────&#xa;pipeline_config        bq_metadata       NONE (small)      —                   Master config KV store&#xa;table_config           bq_metadata       NONE (small)      layer, table_name   Per-table ingestion settings&#xa;pipeline_runs          bq_metadata       dag_run_date      layer, status       Primary execution log&#xa;dq_results             bq_metadata       dag_run_date      layer, table_name   DQ check results&#xa;quarantine             bq_metadata       dag_run_date      source_table        Rejected records&#xa;reconciliation         bq_metadata       dag_run_date      source_layer        Layer row count recon&#xa;alert_log              bq_metadata       created_at        severity, layer     All alerts fired&#xa;schema_version         bq_metadata       NONE              table_name          Schema history&#xa;lineage                bq_metadata       dag_run_date      source_table        Data lineage&#xa;──────────────────────────────────────────────────────────────────────────────&#xa;_dq_results (per-layer) bq_silver_account  processing_date  table_name         Silver-level DQ detail&#xa;                        bq_silver_global&#xa;                        bq_gold_facility&#xa;                        bq_gold_country&#xa;ALL of the above created via: terraform apply → module/bigquery/metadata_tables.tf" style="rounded=1;fillColor=#FFFDE7;strokeColor=#F57F17;fontSize=9;verticalAlign=top;align=left;" vertex="1" parent="1">
+      <mxGeometry x="930" y="2115" width="1175" height="290" as="geometry"/>
+    </mxCell>
+
+  </root>
+</mxGraphModel>
