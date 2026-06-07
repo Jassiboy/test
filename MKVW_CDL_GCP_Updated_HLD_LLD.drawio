@@ -1,0 +1,661 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.7.8 Chrome/128.0.6613.36 Electron/32.0.1 Safari/537.36" version="24.7.8">
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- PAGE 1: HLD — UPDATED WITH GCP SERVICES                          -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <diagram name="MKVW CDL — GCP HLD" id="gcp-hld-page">
+    <mxGraphModel dx="2790" dy="1793" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1800" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- TITLE -->
+        <mxCell id="title" value="&lt;font style=&quot;font-size:22px;&quot; face=&quot;Segoe UI, Arial&quot;&gt;&lt;b&gt;MKVW_CDL Cloud Migration — GCP High-Level Architecture&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="200" y="-43" width="1400" height="44" as="geometry" />
+        </mxCell>
+
+        <!-- ─── ON-PREMISES PANEL ─────────────────────────────────────── -->
+        <mxCell id="src-panel" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8F9FA;strokeColor=#555555;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="19" y="98" width="254" height="762" as="geometry" />
+        </mxCell>
+        <mxCell id="src-label" value="&lt;b&gt;&lt;font face=&quot;Helvetica&quot; style=&quot;font-size: 14px;&quot;&gt;On-Premises&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="73" y="54" width="120" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="oracle-icon" value="" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#2E73B8;fontColor=#ffffff;strokeColor=#1557A0;" parent="1" vertex="1">
+          <mxGeometry x="30" y="332" width="50" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="oracle-label" value="&lt;font face=&quot;Verdana&quot; style=&quot;font-size: 14px;&quot;&gt;&lt;b&gt;Oracle DB&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=top;whiteSpace=wrap;rounded=0;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="18" y="412" width="90" height="24" as="geometry" />
+        </mxCell>
+        <mxCell id="src-tables" value="&lt;font style=&quot;font-size: 14px;&quot; face=&quot;Helvetica&quot;&gt;&lt;b&gt;FXD · FXI · FXG · TNT&lt;/b&gt;&lt;br&gt;Dimension, scan, billing tables&lt;br&gt;(daily / monthly)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#999999;align=center;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="122" y="329" width="126" height="151" as="geometry" />
+        </mxCell>
+
+        <!-- Cloud VPN / Interconnect -->
+        <mxCell id="vpn-box" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;Cloud VPN / Dedicated Interconnect&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px;&quot;&gt;Encrypted transit to GCP&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;align=center;" parent="1" vertex="1">
+          <mxGeometry x="295" y="375" width="95" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="e-onprem-vpn" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#9673A6;strokeWidth=2;" parent="1" source="src-panel" target="vpn-box" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Layer band labels (rotated) -->
+        <mxCell id="lbl-ingest" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:11px;&quot;&gt;Ingestion Layer&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fillColor=#E8F4FD;strokeColor=#4A90D9;rotation=-90;" parent="1" vertex="1">
+          <mxGeometry x="380" y="215" width="110" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-bronze" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:11px;&quot;&gt;Bronze Layer&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fillColor=#FFF3E0;strokeColor=#E67E22;rotation=-90;" parent="1" vertex="1">
+          <mxGeometry x="380" y="472" width="110" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-transform" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:11px;&quot;&gt;Transformation Layer&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fillColor=#E8F5E9;strokeColor=#27AE60;rotation=-90;" parent="1" vertex="1">
+          <mxGeometry x="352" y="848" width="130" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-orch" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:11px;&quot;&gt;Orchestration Layer&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fillColor=#F3E5F5;strokeColor=#8E44AD;rotation=-90;" parent="1" vertex="1">
+          <mxGeometry x="385" y="1383" width="110" height="28" as="geometry" />
+        </mxCell>
+
+        <!-- GCP OUTER BOUNDARY -->
+        <mxCell id="gcp-boundary" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:13px;&quot; color=&quot;#1A56A0&quot;&gt;GOOGLE CLOUD PLATFORM&lt;/font&gt;&lt;/b&gt;" style="rounded=1;arcSize=2;fillColor=#F0F7FF;strokeColor=#1A56A0;strokeWidth=3;opacity=20;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="415" y="75" width="1360" height="1270" as="geometry" />
+        </mxCell>
+
+        <!-- ─── INGESTION LAYER BAND ───────────────────────────────────── -->
+        <mxCell id="bg-ingest" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF4FD;strokeColor=#4A90D9;strokeWidth=1.5;opacity=40;" parent="1" vertex="1">
+          <mxGeometry x="430" y="90" width="1325" height="245" as="geometry" />
+        </mxCell>
+        <mxCell id="title-ingest" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:12px;&quot; color=&quot;#1A3A5C&quot;&gt;Ingestion Layer — Cloud Datastream (CDC) + Cloud Storage Transfer Service (Batch)&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="430" y="68" width="800" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- GCP: Datastream (replaces ADF/Abinitio ETL Tool) -->
+        <mxCell id="etl-tool" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;Cloud Datastream&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:10px;&quot;&gt;CDC from Oracle DB&lt;br&gt;(LogMiner / JDBC)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D6EAF8;strokeColor=#2980B9;align=center;" parent="1" vertex="1">
+          <mxGeometry x="490" y="120" width="190" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- GCP: Pipeline Control Table → BigQuery bq_metadata -->
+        <mxCell id="ctrl-tbl" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;BigQuery: bq_metadata&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:10px;&quot;&gt;pipeline_config · table_config&lt;br&gt;pipeline_runs · watermark&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EAF4FD;strokeColor=#2980B9;align=center;" parent="1" vertex="1">
+          <mxGeometry x="760" y="115" width="210" height="75" as="geometry" />
+        </mxCell>
+
+        <!-- GCP: Pub/Sub event bus -->
+        <mxCell id="pubsub" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;Cloud Pub/Sub&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:10px;&quot;&gt;Ingestion event trigger&lt;br&gt;DQ alert notifications&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#C62828;align=center;" parent="1" vertex="1">
+          <mxGeometry x="1010" y="118" width="175" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- GCP: GCS Raw Zone (replaces ADLS Gen2 / Staging Raw Tables) -->
+        <mxCell id="staging" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;GCS: gs://raw/ingestion/&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:10px;&quot;&gt;Temporary landing zone&lt;br&gt;(Parquet / Avro)&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#AED6F1;strokeColor=#2980B9;" parent="1" vertex="1">
+          <mxGeometry x="1228" y="113" width="170" height="82" as="geometry" />
+        </mxCell>
+
+        <!-- GCP: Fault Tolerance — Ingest (Dataflow retry) -->
+        <mxCell id="ft-ingest" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;Fault Tolerance — Ingest&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:10px;&quot;&gt;Dataflow retry ×3 → Pub/Sub alert&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FADBD8;strokeColor=#C0392B;align=center;" parent="1" vertex="1">
+          <mxGeometry x="1448" y="118" width="210" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- DQ at ingestion -->
+        <mxCell id="ingest-dq" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;Validation / DQ Checks&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;BigQuery DQ Framework&lt;/font&gt;" style="shape=rhombus;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#D4AC0D;align=center;verticalAlign=middle;" parent="1" vertex="1">
+          <mxGeometry x="1240" y="214" width="150" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="stage-reload" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;Staging deleted&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:10px;&quot;&gt;Pub/Sub alert · Reload&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FADBD8;strokeColor=#C0392B;align=center;" parent="1" vertex="1">
+          <mxGeometry x="1448" y="226" width="210" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Edges — Ingestion Layer -->
+        <mxCell id="e-vpn-ds" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#2980B9;strokeWidth=2;" parent="1" source="vpn-box" target="etl-tool" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-etl-ctrl" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#2980B9;strokeWidth=2;" parent="1" source="etl-tool" target="ctrl-tbl" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-etl-ps" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#C62828;strokeWidth=1.5;dashed=1;" parent="1" source="etl-tool" target="pubsub" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-ctrl-stage" value="3" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#2980B9;strokeWidth=2;" parent="1" source="ctrl-tbl" target="staging" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-stage-ft" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#C0392B;strokeWidth=1.5;" parent="1" source="staging" target="ft-ingest" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-stage-dq" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#D4AC0D;strokeWidth=2;" parent="1" source="staging" target="ingest-dq" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-dq-reload" value="On Failure" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#C0392B;strokeWidth=2;fontColor=#C0392B;fontStyle=1;" parent="1" source="ingest-dq" target="stage-reload" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Step numbers -->
+        <mxCell id="n1" value="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#1A5276;fontColor=#FFFFFF;strokeColor=none;fontSize=12;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="430" y="390" width="28" height="28" as="geometry" /></mxCell>
+        <mxCell id="n2" value="2" style="ellipse;whiteSpace=wrap;html=1;fillColor=#1A5276;fontColor=#FFFFFF;strokeColor=none;fontSize=12;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="465" y="148" width="28" height="28" as="geometry" /></mxCell>
+        <mxCell id="n3" value="3" style="ellipse;whiteSpace=wrap;html=1;fillColor=#1A5276;fontColor=#FFFFFF;strokeColor=none;fontSize=12;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="985" y="140" width="28" height="28" as="geometry" /></mxCell>
+
+        <!-- ─── BRONZE LAYER BAND ──────────────────────────────────────── -->
+        <mxCell id="bg-bronze" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8F0;strokeColor=#E67E22;strokeWidth=1.5;opacity=40;" parent="1" vertex="1">
+          <mxGeometry x="430" y="355" width="1325" height="215" as="geometry" />
+        </mxCell>
+        <mxCell id="title-bronze" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:12px;&quot; color=&quot;#7D4A00&quot;&gt;Bronze Layer — GCS (gs://raw/bronze/) + BigQuery: bq_bronze (Parquet / Avro)&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="430" y="335" width="800" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- GCP: Dataflow Ingest Job (replaces generic ETL) -->
+        <mxCell id="dataflow-ingest" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;Cloud Dataflow&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:10px;&quot;&gt;Flex Template — Ingest Job&lt;br&gt;(Apache Beam)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0CC;strokeColor=#E67E22;align=center;" parent="1" vertex="1">
+          <mxGeometry x="490" y="385" width="175" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- GCP: Bronze Tables = BigQuery bq_bronze -->
+        <mxCell id="bronze-tbl" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;BigQuery: bq_bronze&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:10px;&quot;&gt;src_table FXD/FXI/FXG/TNT&lt;br&gt;Append-only · Full audit trail&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#FAD7A0;strokeColor=#E67E22;" parent="1" vertex="1">
+          <mxGeometry x="720" y="378" width="200" height="105" as="geometry" />
+        </mxCell>
+
+        <!-- GCP: GCS Object Storage (replaces ADLS Gen2) -->
+        <mxCell id="obj-store" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;GCS: gs://raw/bronze/&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:10px;&quot;&gt;Parquet + Avro files&lt;br&gt;(reinstatement anchor)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAD7A0;strokeColor=#E67E22;align=center;" parent="1" vertex="1">
+          <mxGeometry x="980" y="385" width="195" height="75" as="geometry" />
+        </mxCell>
+
+        <!-- Account Layer Tables from Bronze (after DQ) -->
+        <mxCell id="acct-layer-tbl" value="&lt;b&gt;Account Layer Tables&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px;&quot;&gt;BigQuery: bq_silver_account&lt;br&gt;Raw account-level records&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#99CCFF;strokeColor=#784212;fontSize=11;fontFamily=Segoe UI, Arial;verticalAlign=bottom;align=center;" parent="1" vertex="1">
+          <mxGeometry x="1230" y="375" width="210" height="105" as="geometry" />
+        </mxCell>
+
+        <!-- Segmentation Join -->
+        <mxCell id="seg-join" value="&lt;b&gt;Segmentation Join&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px;&quot;&gt;CE / SE join logic&lt;br&gt;(BigQuery SQL / dbt)&lt;/font&gt;" style="rounded=2;whiteSpace=wrap;html=1;fillColor=#FAD7A0;strokeColor=#784212;fontSize=11;fontFamily=Segoe UI, Arial;align=center;" parent="1" vertex="1">
+          <mxGeometry x="1490" y="390" width="185" height="75" as="geometry" />
+        </mxCell>
+
+        <!-- Bronze edges -->
+        <mxCell id="e-dq-pass-n4" value="PASS" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#27AE60;strokeWidth=2;fontColor=#27AE60;fontStyle=1;" parent="1" source="ingest-dq" target="dataflow-ingest" edge="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1315" y="360" /><mxPoint x="578" y="360" /></Array></mxGeometry></mxCell>
+        <mxCell id="e-df-bronze" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E67E22;strokeWidth=2;" parent="1" source="dataflow-ingest" target="bronze-tbl" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-bronze-gcs" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E67E22;strokeWidth=2;" parent="1" source="bronze-tbl" target="obj-store" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-gcs-acct" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#784212;strokeWidth=2;" parent="1" source="obj-store" target="acct-layer-tbl" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-acct-seg" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#784212;strokeWidth=2;" parent="1" source="acct-layer-tbl" target="seg-join" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="n4" value="4" style="ellipse;whiteSpace=wrap;html=1;fillColor=#784212;fontColor=#FFFFFF;strokeColor=none;fontSize=12;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="693" y="395" width="28" height="28" as="geometry" /></mxCell>
+        <mxCell id="n5" value="5" style="ellipse;whiteSpace=wrap;html=1;fillColor=#784212;fontColor=#FFFFFF;strokeColor=none;fontSize=12;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="1205" y="415" width="28" height="28" as="geometry" /></mxCell>
+
+        <!-- ─── TRANSFORMATION LAYER ───────────────────────────────────── -->
+        <mxCell id="bg-transform" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0FAF0;strokeColor=#27AE60;strokeWidth=1.5;opacity=40;" parent="1" vertex="1">
+          <mxGeometry x="430" y="590" width="1325" height="355" as="geometry" />
+        </mxCell>
+        <mxCell id="title-transform" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:12px;&quot; color=&quot;#1A5C2A&quot;&gt;Transformation Layer — Cloud Dataflow (Apache Beam) + dbt on BigQuery&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="430" y="568" width="800" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- FACILITY LAYER BOX -->
+        <mxCell id="tf-acct-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#27AE60;strokeWidth=1;" parent="1" vertex="1">
+          <mxGeometry x="442" y="600" width="355" height="317" as="geometry" />
+        </mxCell>
+        <mxCell id="tf-acct-title" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; color=&quot;#1A5C2A&quot;&gt;Facility Layer&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=center;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="442" y="618" width="350" height="22" as="geometry" />
+        </mxCell>
+        <!-- GCP: dbt on BigQuery replaces Spark/Python -->
+        <mxCell id="tf-acct-logic" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;dbt on BigQuery&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px;&quot;&gt;facility_model_1..4&lt;br&gt;SQL transformations&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5F5E3;strokeColor=#27AE60;align=center;" parent="1" vertex="1">
+          <mxGeometry x="458" y="655" width="155" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="tf-acct-ft" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;Fault Tolerance&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:10px;&quot;&gt;Airflow retry / BQ job retry&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FADBD8;strokeColor=#C0392B;align=center;" parent="1" vertex="1">
+          <mxGeometry x="634" y="655" width="150" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="tf-acct-dq" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;Validation / DQ Checks&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;bq_metadata.dq_results&lt;/font&gt;" style="shape=rhombus;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#D4AC0D;align=center;" parent="1" vertex="1">
+          <mxGeometry x="462" y="740" width="160" height="90" as="geometry" />
+        </mxCell>
+        <!-- GCP: Facility Layer Tables = BigQuery bq_gold_facility -->
+        <mxCell id="tf-acct-tbl" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;bq_gold_facility&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;facility_table_1..4&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=8;fillColor=#99CCFF;strokeColor=#1E8449;" parent="1" vertex="1">
+          <mxGeometry x="641" y="742" width="140" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="dq-retry-acct" value="Retry / Rollback&lt;br&gt;Pub/Sub alert · Log to bq_metadata&lt;br&gt;Stop further transform" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FADBD8;strokeColor=#C0392B;align=center;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="462" y="845" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e-acct-logic-dq" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#D4AC0D;strokeWidth=1.5;" parent="1" source="tf-acct-logic" target="tf-acct-dq" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-acct-dq-tbl" value="PASS" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#27AE60;fontColor=#27AE60;fontStyle=1;" parent="1" source="tf-acct-dq" target="tf-acct-tbl" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-acct-dq-retry" value="Fail" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#C0392B;fontColor=#C0392B;fontStyle=1;" parent="1" source="tf-acct-dq" target="dq-retry-acct" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-acct-ft" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#C0392B;dashed=1;" parent="1" source="tf-acct-logic" target="tf-acct-ft" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- COUNTRY LAYER BOX -->
+        <mxCell id="tf-fac-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#27AE60;strokeWidth=1;" parent="1" vertex="1">
+          <mxGeometry x="825" y="610" width="355" height="307" as="geometry" />
+        </mxCell>
+        <mxCell id="rzTLmOayIt0OZiJMdyfH-30" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; color=&quot;#1A5C2A&quot;&gt;Country Layer&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=center;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="825" y="626" width="350" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="tf-fac-logic" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;dbt on BigQuery&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px;&quot;&gt;country_model_1..4&lt;br&gt;SQL roll-up logic&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5F5E3;strokeColor=#27AE60;align=center;" parent="1" vertex="1">
+          <mxGeometry x="840" y="660" width="155" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="tf-fac-ft" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;Fault Tolerance&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:10px;&quot;&gt;Airflow retry / BQ job retry&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FADBD8;strokeColor=#C0392B;align=center;" parent="1" vertex="1">
+          <mxGeometry x="1010" y="660" width="150" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="tf-fac-dq" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;Validation / DQ Checks&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;bq_metadata.dq_results&lt;/font&gt;" style="shape=rhombus;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#D4AC0D;align=center;" parent="1" vertex="1">
+          <mxGeometry x="842" y="748" width="155" height="80" as="geometry" />
+        </mxCell>
+        <!-- GCP: Country Layer Tables = BigQuery bq_gold_country -->
+        <mxCell id="tf-fac-tbl" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;bq_gold_country&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;country_table_1..4&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=8;fillColor=#99CCFF;strokeColor=#1E8449;" parent="1" vertex="1">
+          <mxGeometry x="1012" y="748" width="150" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="dq-retry-fac" value="Retry / Rollback&lt;br&gt;Pub/Sub alert · Log to bq_metadata&lt;br&gt;Stop further transform" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FADBD8;strokeColor=#C0392B;align=center;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="842" y="845" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e-fac-logic-dq" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#D4AC0D;strokeWidth=1.5;" parent="1" source="tf-fac-logic" target="tf-fac-dq" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-fac-dq-tbl" value="PASS" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#27AE60;fontColor=#27AE60;fontStyle=1;" parent="1" source="tf-fac-dq" target="tf-fac-tbl" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-fac-dq-retry" value="Fail" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#C0392B;fontColor=#C0392B;fontStyle=1;" parent="1" source="tf-fac-dq" target="dq-retry-fac" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-fac-ft2" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#C0392B;dashed=1;" parent="1" source="tf-fac-logic" target="tf-fac-ft" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- GLOBAL LAYER BOX -->
+        <mxCell id="tf-glb-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#27AE60;strokeWidth=1;" parent="1" vertex="1">
+          <mxGeometry x="1210" y="608" width="520" height="317" as="geometry" />
+        </mxCell>
+        <mxCell id="rzTLmOayIt0OZiJMdyfH-31" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; color=&quot;#1A5C2A&quot;&gt;Global Layer&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=center;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="1210" y="626" width="515" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="tf-glb-logic" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;dbt on BigQuery&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px;&quot;&gt;global_model_1..4&lt;br&gt;JOIN account + dims&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5F5E3;strokeColor=#27AE60;align=center;" parent="1" vertex="1">
+          <mxGeometry x="1228" y="658" width="175" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="tf-glb-ft" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;Fault Tolerance&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:10px;&quot;&gt;Airflow retry / BQ job retry&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FADBD8;strokeColor=#C0392B;align=center;" parent="1" vertex="1">
+          <mxGeometry x="1430" y="658" width="280" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="tf-glb-dq" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;Validation / DQ Checks&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;bq_metadata.dq_results&lt;/font&gt;" style="shape=rhombus;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#D4AC0D;align=center;" parent="1" vertex="1">
+          <mxGeometry x="1226" y="746" width="165" height="90" as="geometry" />
+        </mxCell>
+        <!-- GCP: Global Layer Tables = BigQuery bq_silver_global -->
+        <mxCell id="tf-glb-tbl" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;bq_silver_global&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;global_table_1..4&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=8;fillColor=#99CCFF;strokeColor=#1E8449;" parent="1" vertex="1">
+          <mxGeometry x="1440" y="742" width="260" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="dq-retry-glb" value="Retry / Rollback&lt;br&gt;Pub/Sub alert · Log to bq_metadata&lt;br&gt;Stop further transform" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FADBD8;strokeColor=#C0392B;align=center;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="1228" y="853" width="195" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e-glb-logic-dq" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#D4AC0D;strokeWidth=1.5;" parent="1" source="tf-glb-logic" target="tf-glb-dq" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-glb-dq-tbl" value="PASS" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#27AE60;fontColor=#27AE60;fontStyle=1;" parent="1" source="tf-glb-dq" target="tf-glb-tbl" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-glb-dq-retry" value="Fail" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#C0392B;fontColor=#C0392B;fontStyle=1;" parent="1" source="tf-glb-dq" target="dq-retry-glb" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-glb-ft2" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#C0392B;dashed=1;" parent="1" source="tf-glb-logic" target="tf-glb-ft" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Inter-layer flow numbers -->
+        <mxCell id="n6" value="6" style="ellipse;whiteSpace=wrap;html=1;fillColor=#1A5276;fontColor=#FFFFFF;strokeColor=none;fontSize=12;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="1540" y="460" width="28" height="28" as="geometry" /></mxCell>
+        <mxCell id="n7" value="7" style="ellipse;whiteSpace=wrap;html=1;fillColor=#1A5276;fontColor=#FFFFFF;strokeColor=none;fontSize=12;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="797" y="762" width="28" height="28" as="geometry" /></mxCell>
+        <mxCell id="n8" value="8" style="ellipse;whiteSpace=wrap;html=1;fillColor=#1A5276;fontColor=#FFFFFF;strokeColor=none;fontSize=12;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="1183" y="762" width="28" height="28" as="geometry" /></mxCell>
+
+        <!-- Arrows between transform boxes -->
+        <mxCell id="e-seg-fac" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8E44AD;strokeWidth=1.5;" parent="1" source="seg-join" target="tf-fac-logic" edge="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1582" y="500" /><mxPoint x="917" y="500" /></Array></mxGeometry></mxCell>
+        <mxCell id="e-acct-tbl-fac" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8E44AD;strokeWidth=1.5;" parent="1" source="tf-acct-tbl" target="tf-fac-logic" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-fac-tbl-glb" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#2980B9;strokeWidth=2;" parent="1" source="tf-fac-tbl" target="tf-glb-logic" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- Cross-Layer DQ -->
+        <mxCell id="cross-dq" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;Cross-Layer DQ Checks&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;bq_metadata.reconciliation&lt;/font&gt;" style="shape=rhombus;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#D4AC0D;align=center;" parent="1" vertex="1">
+          <mxGeometry x="831" y="1003" width="312" height="131" as="geometry" />
+        </mxCell>
+        <mxCell id="dq-retry-cross" value="Retry / Rollback · Pub/Sub alert" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FADBD8;strokeColor=#C0392B;align=center;fontSize=10;" parent="1" vertex="1">
+          <mxGeometry x="1280" y="1045" width="175" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="e-acct-crossdq" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#D4AC0D;strokeWidth=1;" parent="1" source="tf-acct-bg" target="cross-dq" edge="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="618" y="970" /><mxPoint x="940" y="970" /></Array></mxGeometry></mxCell>
+        <mxCell id="e-fac-crossdq" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#D4AC0D;strokeWidth=1;" parent="1" source="tf-fac-bg" target="cross-dq" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-glb-crossdq" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#D4AC0D;strokeWidth=1;" parent="1" source="tf-glb-bg" target="cross-dq" edge="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1340" y="968" /><mxPoint x="1000" y="968" /></Array></mxGeometry></mxCell>
+        <mxCell id="e-crossdq-retry" value="Fail" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#C0392B;fontColor=#C0392B;fontStyle=1;" parent="1" source="cross-dq" target="dq-retry-cross" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- ALL SUCCESS -->
+        <mxCell id="all-success" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; color=&quot;#1A5C2A&quot;&gt;ALL SUCCESS&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:10px;&quot;&gt;Pub/Sub notification · Email alert&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5F5E3;strokeColor=#27AE60;align=center;" parent="1" vertex="1">
+          <mxGeometry x="886" y="1186" width="200" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="e-crossdq-success" value="ALL PASS" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#27AE60;strokeWidth=2;fontColor=#27AE60;fontStyle=1;" parent="1" source="cross-dq" target="all-success" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- ─── ORCHESTRATION LAYER ────────────────────────────────────── -->
+        <mxCell id="bg-orch" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8F0FF;strokeColor=#8E44AD;strokeWidth=1.5;opacity=40;" parent="1" vertex="1">
+          <mxGeometry x="430" y="1285" width="1325" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="title-orch" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:12px;&quot; color=&quot;#5B2C6F&quot;&gt;Orchestration Layer — Cloud Composer 2 (Managed Airflow)&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="430" y="1265" width="700" height="22" as="geometry" />
+        </mxCell>
+
+        <!-- GCP: Cloud Composer (replaces Airflow) -->
+        <mxCell id="airflow" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;Cloud Composer 2&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:10px;&quot;&gt;Managed Airflow&lt;br&gt;master_pipeline_dag&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8DAEF;strokeColor=#8E44AD;align=center;" parent="1" vertex="1">
+          <mxGeometry x="490" y="1308" width="200" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- GCP: Run Metadata = BigQuery bq_metadata.pipeline_runs -->
+        <mxCell id="run-meta" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;bq_metadata.pipeline_runs&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:10px;&quot;&gt;Run status + watermark update&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=8;fillColor=#D7BDE2;strokeColor=#6C3483;" parent="1" vertex="1">
+          <mxGeometry x="760" y="1305" width="210" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- GCP: Reinstatement Workflow -->
+        <mxCell id="reinstate" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;Reinstatement Workflow&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:10px;&quot;&gt;sp_reinstate_pipeline (BQ SP)&lt;br&gt;Delete partition → Re-run DAG&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8DAEF;strokeColor=#8E44AD;align=center;" parent="1" vertex="1">
+          <mxGeometry x="1040" y="1305" width="220" height="75" as="geometry" />
+        </mxCell>
+
+        <!-- GCP: DQ Framework -->
+        <mxCell id="dq-framework" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:12px;&quot;&gt;DQ Framework&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:10px;&quot;&gt;bq_metadata.dq_results&lt;br&gt;YAML rules in GCS config bucket&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEF9E7;strokeColor=#D4AC0D;strokeWidth=2;align=center;" parent="1" vertex="1">
+          <mxGeometry x="1330" y="1305" width="200" height="75" as="geometry" />
+        </mxCell>
+
+        <!-- GCP: Data Catalog / Serving (replaces Hive Metastore / Unity) -->
+        <mxCell id="data-catalog" value="&lt;b&gt;Dataplex + Data Catalog&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px;&quot;&gt;Lineage · BigQuery external tables&lt;br&gt;bq_consumption (Looker/BI)&lt;/font&gt;" style="rounded=2;whiteSpace=wrap;html=1;fillColor=#D1F2EB;strokeColor=#117A65;fontSize=11;fontFamily=Segoe UI, Arial;align=center;" parent="1" vertex="1">
+          <mxGeometry x="1588" y="1305" width="145" height="75" as="geometry" />
+        </mxCell>
+
+        <!-- Secret Manager + Cloud Monitoring (cross-cutting) -->
+        <mxCell id="secret-mgr" value="&lt;b&gt;Secret Manager&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Credentials&lt;/font&gt;" style="rounded=1;fillColor=#FFF3E0;strokeColor=#E65100;fontSize=9;align=center;" parent="1" vertex="1">
+          <mxGeometry x="1588" y="1165" width="140" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="cloud-monitoring" value="&lt;b&gt;Cloud Monitoring&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Dashboards · Alerting&lt;/font&gt;" style="rounded=1;fillColor=#E8F5E9;strokeColor=#2E7D32;fontSize=9;align=center;" parent="1" vertex="1">
+          <mxGeometry x="1588" y="1228" width="140" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="cloud-build" value="&lt;b&gt;Cloud Build&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;CI/CD · Terraform&lt;/font&gt;" style="rounded=1;fillColor=#FFF8E1;strokeColor=#F57F17;fontSize=9;align=center;" parent="1" vertex="1">
+          <mxGeometry x="1588" y="1100" width="140" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Orchestration edges -->
+        <mxCell id="e-composer-meta" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8E44AD;strokeWidth=1.5;" parent="1" source="airflow" target="run-meta" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-composer-reinstate" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8E44AD;strokeWidth=1.5;" parent="1" source="airflow" target="reinstate" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-success-catalog" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#27AE60;strokeWidth=2;" parent="1" source="all-success" target="data-catalog" edge="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="986" y="1260" /><mxPoint x="1658" y="1260" /></Array></mxGeometry></mxCell>
+        <mxCell id="e-success-composer" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#27AE60;strokeWidth=1.5;" parent="1" source="all-success" target="airflow" edge="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="986" y="1258" /><mxPoint x="590" y="1258" /></Array></mxGeometry></mxCell>
+
+        <!-- ─── CLOUD PORTABILITY MATRIX ──────────────────────────────── -->
+        <mxCell id="matrix-bg1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#999;strokeWidth=1;" parent="1" vertex="1">
+          <mxGeometry x="430" y="1470" width="640" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="matrix-title1" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:12px;&quot; color=&quot;#1A3A5C&quot;&gt;Cloud Portability Matrix — Ingestion&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=top;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="430" y="1478" width="640" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="mat1-today" value="&lt;b&gt;Today&lt;/b&gt;&lt;br&gt;ADF / Abinitio" style="rounded=1;fillColor=#CCE5FF;strokeColor=#2980B9;fontSize=11;align=center;" parent="1" vertex="1"><mxGeometry x="445" y="1510" width="160" height="45" as="geometry" /></mxCell>
+        <mxCell id="mat1-port" value="&lt;b&gt;Portable Layer&lt;/b&gt;&lt;br&gt;Spark JDBC connector" style="rounded=1;fillColor=#E6E6E6;strokeColor=#999;fontSize=11;align=center;" parent="1" vertex="1"><mxGeometry x="630" y="1510" width="175" height="45" as="geometry" /></mxCell>
+        <mxCell id="mat1-gcp" value="&lt;b&gt;GCP ✓&lt;/b&gt;&lt;br&gt;Cloud Datastream" style="rounded=1;fillColor=#CCFFE6;strokeColor=#27AE60;fontSize=11;align=center;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="830" y="1510" width="220" height="45" as="geometry" /></mxCell>
+        <mxCell id="mat1-effort" value="&lt;b&gt;Migration Effort:&lt;/b&gt;&lt;br&gt;If Abinitio — &lt;b style=&quot;color:#27AE60&quot;&gt;Negligible&lt;/b&gt;&lt;br&gt;If ADF — &lt;b style=&quot;color:#E67E22&quot;&gt;Minimal&lt;/b&gt;" style="rounded=1;fillColor=#FFFDE7;strokeColor=#F9A825;fontSize=10;align=left;" parent="1" vertex="1"><mxGeometry x="445" y="1572" width="605" height="45" as="geometry" /></mxCell>
+        <mxCell id="e-mat1-1" value="" style="edgeStyle=orthogonalEdgeStyle;" parent="1" source="mat1-today" target="mat1-port" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-mat1-2" value="" style="edgeStyle=orthogonalEdgeStyle;" parent="1" source="mat1-port" target="mat1-gcp" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="matrix-bg2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#999;strokeWidth=1;" parent="1" vertex="1">
+          <mxGeometry x="1110" y="1470" width="640" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="matrix-title2" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:12px;&quot; color=&quot;#1A3A5C&quot;&gt;Cloud Portability Matrix — Object Storage&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=top;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="1110" y="1478" width="640" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="mat2-today" value="&lt;b&gt;Today&lt;/b&gt;&lt;br&gt;ADLS Gen2" style="rounded=1;fillColor=#CCE5FF;strokeColor=#2980B9;fontSize=11;align=center;" parent="1" vertex="1"><mxGeometry x="1125" y="1510" width="150" height="45" as="geometry" /></mxCell>
+        <mxCell id="mat2-port" value="&lt;b&gt;Portable Layer&lt;/b&gt;&lt;br&gt;Delta Lake + Parquet" style="rounded=1;fillColor=#E6E6E6;strokeColor=#999;fontSize=11;align=center;" parent="1" vertex="1"><mxGeometry x="1302" y="1510" width="175" height="45" as="geometry" /></mxCell>
+        <mxCell id="mat2-gcp" value="&lt;b&gt;GCP ✓&lt;/b&gt;&lt;br&gt;Google Cloud Storage (GCS)" style="rounded=1;fillColor=#CCFFE6;strokeColor=#27AE60;fontSize=11;align=center;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="1504" y="1510" width="225" height="45" as="geometry" /></mxCell>
+        <mxCell id="mat2-effort" value="&lt;b&gt;Migration Effort:&lt;/b&gt;&lt;br&gt;&lt;b style=&quot;color:#27AE60&quot;&gt;Negligible&lt;/b&gt; — same Parquet format, GCS drop-in for ADLS" style="rounded=1;fillColor=#FFFDE7;strokeColor=#F9A825;fontSize=10;align=left;" parent="1" vertex="1"><mxGeometry x="1125" y="1572" width="604" height="45" as="geometry" /></mxCell>
+        <mxCell id="e-mat2-1" value="" style="edgeStyle=orthogonalEdgeStyle;" parent="1" source="mat2-today" target="mat2-port" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-mat2-2" value="" style="edgeStyle=orthogonalEdgeStyle;" parent="1" source="mat2-port" target="mat2-gcp" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="matrix-bg3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#999;strokeWidth=1;" parent="1" vertex="1">
+          <mxGeometry x="430" y="1650" width="640" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="matrix-title3" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:12px;&quot; color=&quot;#1A3A5C&quot;&gt;Cloud Portability Matrix — Compute / Transform&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=top;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="430" y="1658" width="640" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="mat3-today" value="&lt;b&gt;Today&lt;/b&gt;&lt;br&gt;Databricks" style="rounded=1;fillColor=#CCE5FF;strokeColor=#2980B9;fontSize=11;align=center;" parent="1" vertex="1"><mxGeometry x="445" y="1690" width="150" height="45" as="geometry" /></mxCell>
+        <mxCell id="mat3-port" value="&lt;b&gt;Portable Layer&lt;/b&gt;&lt;br&gt;.py files (PySpark)" style="rounded=1;fillColor=#E6E6E6;strokeColor=#999;fontSize=11;align=center;" parent="1" vertex="1"><mxGeometry x="622" y="1690" width="175" height="45" as="geometry" /></mxCell>
+        <mxCell id="mat3-gcp" value="&lt;b&gt;GCP ✓&lt;/b&gt;&lt;br&gt;Dataproc / dbt on BigQuery" style="rounded=1;fillColor=#CCFFE6;strokeColor=#27AE60;fontSize=11;align=center;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="824" y="1690" width="225" height="45" as="geometry" /></mxCell>
+        <mxCell id="mat3-effort" value="&lt;b&gt;Migration Effort:&lt;/b&gt; &lt;b style=&quot;color:#27AE60&quot;&gt;Negligible&lt;/b&gt; — .py files portable; dbt SQL models reusable" style="rounded=1;fillColor=#FFFDE7;strokeColor=#F9A825;fontSize=10;align=left;" parent="1" vertex="1"><mxGeometry x="445" y="1752" width="604" height="45" as="geometry" /></mxCell>
+        <mxCell id="e-mat3-1" value="" style="edgeStyle=orthogonalEdgeStyle;" parent="1" source="mat3-today" target="mat3-port" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-mat3-2" value="" style="edgeStyle=orthogonalEdgeStyle;" parent="1" source="mat3-port" target="mat3-gcp" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="matrix-bg4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#999;strokeWidth=1;" parent="1" vertex="1">
+          <mxGeometry x="1110" y="1650" width="640" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="matrix-title4" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot; style=&quot;font-size:12px;&quot; color=&quot;#1A3A5C&quot;&gt;Cloud Portability Matrix — Catalog / Serving&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=top;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="1110" y="1658" width="640" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="mat4-today" value="&lt;b&gt;Today&lt;/b&gt;&lt;br&gt;Databricks Hive metastore" style="rounded=1;fillColor=#CCE5FF;strokeColor=#2980B9;fontSize=11;align=center;" parent="1" vertex="1"><mxGeometry x="1125" y="1690" width="175" height="45" as="geometry" /></mxCell>
+        <mxCell id="mat4-port" value="&lt;b&gt;Portable Layer&lt;/b&gt;&lt;br&gt;External tables on Delta" style="rounded=1;fillColor=#E6E6E6;strokeColor=#999;fontSize=11;align=center;" parent="1" vertex="1"><mxGeometry x="1327" y="1690" width="175" height="45" as="geometry" /></mxCell>
+        <mxCell id="mat4-gcp" value="&lt;b&gt;GCP ✓&lt;/b&gt;&lt;br&gt;Dataplex / BigQuery ext tables" style="rounded=1;fillColor=#CCFFE6;strokeColor=#27AE60;fontSize=11;align=center;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="1529" y="1690" width="200" height="45" as="geometry" /></mxCell>
+        <mxCell id="mat4-effort" value="&lt;b&gt;Migration Effort:&lt;/b&gt; If Catalog — &lt;b style=&quot;color:#27AE60&quot;&gt;Negligible&lt;/b&gt;  |  If BigQuery — &lt;b style=&quot;color:#E67E22&quot;&gt;Minimal&lt;/b&gt;" style="rounded=1;fillColor=#FFFDE7;strokeColor=#F9A825;fontSize=10;align=left;" parent="1" vertex="1"><mxGeometry x="1125" y="1752" width="604" height="45" as="geometry" /></mxCell>
+        <mxCell id="e-mat4-1" value="" style="edgeStyle=orthogonalEdgeStyle;" parent="1" source="mat4-today" target="mat4-port" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-mat4-2" value="" style="edgeStyle=orthogonalEdgeStyle;" parent="1" source="mat4-port" target="mat4-gcp" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- LEGEND -->
+        <mxCell id="legend-bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8F9FA;strokeColor=#888;strokeWidth=1;" parent="1" vertex="1">
+          <mxGeometry x="19" y="900" width="254" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-title" value="&lt;b&gt;&lt;font face=&quot;Segoe UI, Arial&quot;&gt;GCP Services Legend&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=left;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="28" y="908" width="200" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-ds" value="Cloud Datastream (CDC)" style="rounded=1;fillColor=#D6EAF8;strokeColor=#2980B9;fontSize=10;align=left;" parent="1" vertex="1"><mxGeometry x="28" y="935" width="220" height="24" as="geometry" /></mxCell>
+        <mxCell id="leg-df" value="Cloud Dataflow (Beam ETL)" style="rounded=1;fillColor=#FFE0CC;strokeColor=#E67E22;fontSize=10;align=left;" parent="1" vertex="1"><mxGeometry x="28" y="965" width="220" height="24" as="geometry" /></mxCell>
+        <mxCell id="leg-gcs" value="Cloud Storage — GCS" style="rounded=1;fillColor=#FAD7A0;strokeColor=#E67E22;fontSize=10;align=left;" parent="1" vertex="1"><mxGeometry x="28" y="995" width="220" height="24" as="geometry" /></mxCell>
+        <mxCell id="leg-bq" value="BigQuery (all layers)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=6;fillColor=#99CCFF;strokeColor=#1E8449;fontSize=10;" parent="1" vertex="1"><mxGeometry x="28" y="1025" width="220" height="32" as="geometry" /></mxCell>
+        <mxCell id="leg-dbt" value="dbt on BigQuery (transforms)" style="rounded=1;fillColor=#D5F5E3;strokeColor=#27AE60;fontSize=10;align=left;" parent="1" vertex="1"><mxGeometry x="28" y="1063" width="220" height="24" as="geometry" /></mxCell>
+        <mxCell id="leg-ps" value="Cloud Pub/Sub (events/alerts)" style="rounded=1;fillColor=#FCE4EC;strokeColor=#C62828;fontSize=10;align=left;" parent="1" vertex="1"><mxGeometry x="28" y="1093" width="220" height="24" as="geometry" /></mxCell>
+        <mxCell id="leg-cc" value="Cloud Composer 2 (Airflow)" style="rounded=1;fillColor=#E8DAEF;strokeColor=#8E44AD;fontSize=10;align=left;" parent="1" vertex="1"><mxGeometry x="28" y="1123" width="220" height="24" as="geometry" /></mxCell>
+        <mxCell id="leg-dp" value="Dataplex + Data Catalog" style="rounded=1;fillColor=#D1F2EB;strokeColor=#117A65;fontSize=10;align=left;" parent="1" vertex="1"><mxGeometry x="28" y="1153" width="220" height="24" as="geometry" /></mxCell>
+        <mxCell id="leg-mon" value="Cloud Monitoring + Logging" style="rounded=1;fillColor=#E8F5E9;strokeColor=#2E7D32;fontSize=10;align=left;" parent="1" vertex="1"><mxGeometry x="28" y="1183" width="220" height="24" as="geometry" /></mxCell>
+        <mxCell id="leg-ft" value="Fault Tolerance / Error path" style="rounded=1;fillColor=#FADBD8;strokeColor=#C0392B;fontSize=10;align=left;" parent="1" vertex="1"><mxGeometry x="28" y="1213" width="220" height="24" as="geometry" /></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- PAGE 2: LLD — DETAILED COMPONENT BREAKDOWN                       -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <diagram name="MKVW CDL — GCP LLD" id="gcp-lld-page">
+    <mxGraphModel dx="2200" dy="1400" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="2200" pageHeight="2800" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- TITLE -->
+        <mxCell id="lld-title" value="&lt;font style=&quot;font-size:22px;&quot; face=&quot;Segoe UI, Arial&quot;&gt;&lt;b&gt;MKVW_CDL — GCP Low-Level Design (LLD)&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fillColor=none;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="200" y="15" width="1800" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lld-sub" value="BigQuery Datasets · Config Tables · Log Tables · Orchestration DAG Flow · Reinstatement Logic · DQ Framework" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fillColor=none;strokeColor=none;fontSize=13;fontColor=#555;" parent="1" vertex="1">
+          <mxGeometry x="200" y="50" width="1800" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- SECTION A: BigQuery Dataset Map -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <mxCell id="bq-section" value="A.  BigQuery Dataset Architecture — All Layers" style="rounded=1;arcSize=2;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=3;fontSize=14;fontStyle=1;fontColor=#0D47A1;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="50" y="90" width="2110" height="380" as="geometry" />
+        </mxCell>
+
+        <!-- bq_bronze -->
+        <mxCell id="bq-bronze-box" value="&lt;b&gt;bq_bronze&lt;/b&gt;&lt;br&gt;(Bronze — Raw Ingested)&lt;br&gt;─────────────────&lt;br&gt;src_FXD · src_FXI&lt;br&gt;src_FXG · src_TNT&lt;br&gt;dim_table_1 · dim_table_2&lt;br&gt;_audit_log · _schema_version&lt;br&gt;─────────────────&lt;br&gt;PARTITION: _ingestion_date&lt;br&gt;CLUSTER: source_system&lt;br&gt;EXPIRE: 365 days" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=10;verticalAlign=bottom;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="80" y="135" width="200" height="290" as="geometry" />
+        </mxCell>
+
+        <!-- bq_silver_account -->
+        <mxCell id="bq-silver-acct-box" value="&lt;b&gt;bq_silver_account&lt;/b&gt;&lt;br&gt;(Silver — Account Layer)&lt;br&gt;─────────────────&lt;br&gt;acct_FXD · acct_FXI&lt;br&gt;acct_FXG · acct_TNT&lt;br&gt;_dq_results · _recon&lt;br&gt;─────────────────&lt;br&gt;PARTITION: processing_date&lt;br&gt;CLUSTER: account_id,region&lt;br&gt;EXPIRE: 730 days" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#C8E6C9;strokeColor=#1B5E20;fontSize=10;verticalAlign=bottom;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="330" y="135" width="200" height="290" as="geometry" />
+        </mxCell>
+
+        <!-- bq_silver_global -->
+        <mxCell id="bq-silver-glb-box" value="&lt;b&gt;bq_silver_global&lt;/b&gt;&lt;br&gt;(Silver — Global Layer)&lt;br&gt;─────────────────&lt;br&gt;global_table_1..4&lt;br&gt;(Account + Dim JOIN)&lt;br&gt;_dq_results&lt;br&gt;─────────────────&lt;br&gt;PARTITION: processing_date&lt;br&gt;CLUSTER: country_code,&lt;br&gt;facility_id&lt;br&gt;EXPIRE: 730 days" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=10;verticalAlign=bottom;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="580" y="135" width="200" height="290" as="geometry" />
+        </mxCell>
+
+        <!-- bq_gold_facility -->
+        <mxCell id="bq-gold-fac-box" value="&lt;b&gt;bq_gold_facility&lt;/b&gt;&lt;br&gt;(Gold — Facility Layer)&lt;br&gt;─────────────────&lt;br&gt;facility_table_1..4&lt;br&gt;(Aggregated)&lt;br&gt;_dq_results&lt;br&gt;─────────────────&lt;br&gt;PARTITION: reporting_date&lt;br&gt;CLUSTER: facility_id,&lt;br&gt;country_code&lt;br&gt;EXPIRE: None" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=10;verticalAlign=bottom;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="830" y="135" width="200" height="290" as="geometry" />
+        </mxCell>
+
+        <!-- bq_gold_country -->
+        <mxCell id="bq-gold-cty-box" value="&lt;b&gt;bq_gold_country&lt;/b&gt;&lt;br&gt;(Gold — Country Layer)&lt;br&gt;─────────────────&lt;br&gt;country_table_1..4&lt;br&gt;(Final Roll-up)&lt;br&gt;_dq_results&lt;br&gt;─────────────────&lt;br&gt;PARTITION: reporting_date&lt;br&gt;CLUSTER: country_code&lt;br&gt;EXPIRE: None" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=10;verticalAlign=bottom;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="1080" y="135" width="200" height="290" as="geometry" />
+        </mxCell>
+
+        <!-- bq_metadata -->
+        <mxCell id="bq-meta-box" value="&lt;b&gt;bq_metadata&lt;/b&gt;&lt;br&gt;(Control + Audit)&lt;br&gt;─────────────────&lt;br&gt;pipeline_config&lt;br&gt;table_config&lt;br&gt;pipeline_runs ← LOG&lt;br&gt;dq_results&lt;br&gt;quarantine&lt;br&gt;reconciliation&lt;br&gt;alert_log&lt;br&gt;schema_version&lt;br&gt;lineage&lt;br&gt;─────────────────&lt;br&gt;All partitioned by date&lt;br&gt;Cluster: layer,table,status" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#EDE7F6;strokeColor=#4A148C;fontSize=10;verticalAlign=bottom;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="1330" y="120" width="205" height="325" as="geometry" />
+        </mxCell>
+
+        <!-- bq_consumption -->
+        <mxCell id="bq-cons-box" value="&lt;b&gt;bq_consumption&lt;/b&gt;&lt;br&gt;(Serving Layer)&lt;br&gt;─────────────────&lt;br&gt;Authorized Views&lt;br&gt;Materialized Views&lt;br&gt;Looker / BI APIs&lt;br&gt;External dashboards&lt;br&gt;─────────────────&lt;br&gt;No DML access&lt;br&gt;Read-only grants&lt;br&gt;BI Engine enabled" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#D1F2EB;strokeColor=#117A65;fontSize=10;verticalAlign=bottom;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="1590" y="135" width="200" height="290" as="geometry" />
+        </mxCell>
+
+        <!-- GCS Bucket structure -->
+        <mxCell id="gcs-box" value="&lt;b&gt;GCS Buckets&lt;/b&gt;&lt;br&gt;─────────────────────&lt;br&gt;gs://[proj]-raw/&lt;br&gt;  ingestion/ | bronze/&lt;br&gt;  cdc/ | checkpoints/&lt;br&gt;gs://[proj]-config/&lt;br&gt;  dq-rules/ | schema-registry/&lt;br&gt;  pipeline-config/&lt;br&gt;gs://[proj]-staging/&lt;br&gt;  dataflow-templates/ | temp/&lt;br&gt;gs://[proj]-composer/&lt;br&gt;  dags/ | plugins/ | logs/&lt;br&gt;gs://[proj]-archive/&lt;br&gt;  bronze/ (Coldline)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;fontSize=10;verticalAlign=top;align=left;" parent="1" vertex="1">
+          <mxGeometry x="1840" y="120" width="290" height="330" as="geometry" />
+        </mxCell>
+
+        <!-- Data flow arrows across datasets -->
+        <mxCell id="e-bq-b-a" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;strokeWidth=2;" parent="1" source="bq-bronze-box" target="bq-silver-acct-box" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-bq-a-g" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1565C0;strokeWidth=2;" parent="1" source="bq-silver-acct-box" target="bq-silver-glb-box" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-bq-g-f" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=2;" parent="1" source="bq-silver-glb-box" target="bq-gold-fac-box" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-bq-f-c" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#B71C1C;strokeWidth=2;" parent="1" source="bq-gold-fac-box" target="bq-gold-cty-box" edge="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-bq-c-cons" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#117A65;strokeWidth=2;" parent="1" source="bq-gold-cty-box" target="bq-cons-box" edge="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1180" y="450" /><mxPoint x="1690" y="450" /></Array></mxGeometry></mxCell>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- SECTION B: Config Tables Detail -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <mxCell id="cfg-section" value="B.  Configuration Tables — bq_metadata Dataset" style="rounded=1;arcSize=2;fillColor=#E8EAF6;strokeColor=#3949AB;strokeWidth=3;fontSize=14;fontStyle=1;fontColor=#1A237E;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="50" y="490" width="2110" height="420" as="geometry" />
+        </mxCell>
+
+        <!-- pipeline_config -->
+        <mxCell id="cfg-pc" value="&lt;b&gt;pipeline_config&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#3949AB&quot;&gt;WHERE: bq_metadata&lt;/font&gt;&lt;br&gt;──────────────────&lt;br&gt;config_key  STRING PK&lt;br&gt;config_value  STRING&lt;br&gt;data_type  STRING&lt;br&gt;description  STRING&lt;br&gt;layer  STRING&lt;br&gt;is_active  BOOL&lt;br&gt;created_at  TIMESTAMP&lt;br&gt;updated_at  TIMESTAMP&lt;br&gt;──────────────────&lt;br&gt;Sample keys:&lt;br&gt;ingestion_batch_size&lt;br&gt;max_retry_count = 3&lt;br&gt;dq_tier1_halt = true&lt;br&gt;enable_cdc = true&lt;br&gt;watermark_col_default" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EAF6;strokeColor=#3949AB;fontSize=9;verticalAlign=top;align=left;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="70" y="535" width="230" height="350" as="geometry" />
+        </mxCell>
+
+        <!-- table_config -->
+        <mxCell id="cfg-tc" value="&lt;b&gt;table_config&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#3949AB&quot;&gt;WHERE: bq_metadata&lt;/font&gt;&lt;br&gt;──────────────────&lt;br&gt;table_id  STRING PK&lt;br&gt;source_system  STRING&lt;br&gt;source_table_name&lt;br&gt;target_dataset  STRING&lt;br&gt;target_table_name&lt;br&gt;layer  STRING&lt;br&gt;ingestion_mode  STRING&lt;br&gt;  (FULL/INCR/CDC)&lt;br&gt;watermark_column&lt;br&gt;watermark_type&lt;br&gt;partition_col&lt;br&gt;cluster_cols&lt;br&gt;sla_hours  INT64&lt;br&gt;depends_on  STRING&lt;br&gt;dbt_model_name&lt;br&gt;is_active  BOOL&lt;br&gt;created_at  TIMESTAMP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EAF6;strokeColor=#3949AB;fontSize=9;verticalAlign=top;align=left;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="320" y="535" width="230" height="350" as="geometry" />
+        </mxCell>
+
+        <!-- pipeline_runs (PRIMARY LOG) -->
+        <mxCell id="log-pr" value="&lt;b&gt;pipeline_runs  ← PRIMARY LOG&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#B71C1C&quot;&gt;WHERE: bq_metadata | PARTITION: dag_run_date&lt;/font&gt;&lt;br&gt;──────────────────&lt;br&gt;run_id  STRING PK (SHA256)&lt;br&gt;dag_run_date  DATE&lt;br&gt;dag_id / task_id  STRING&lt;br&gt;layer / table_name  STRING&lt;br&gt;status  STRING&lt;br&gt;  RUNNING/SUCCESS/FAILED&lt;br&gt;  /SKIPPED/HALTED&lt;br&gt;attempt_number  INT64&lt;br&gt;rows_read/written/rejected&lt;br&gt;rows_merged/inserted/updated&lt;br&gt;watermark_start  STRING&lt;br&gt;watermark_end  STRING&lt;br&gt;started_at  TIMESTAMP&lt;br&gt;completed_at  TIMESTAMP&lt;br&gt;bq_job_id  STRING&lt;br&gt;dataflow_job_id  STRING&lt;br&gt;error_message  STRING&lt;br&gt;rerun_triggered_by  STRING&lt;br&gt;parent_run_id  STRING" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBEE;strokeColor=#B71C1C;fontSize=9;verticalAlign=top;align=left;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="570" y="525" width="265" height="375" as="geometry" />
+        </mxCell>
+
+        <!-- dq_results -->
+        <mxCell id="log-dq" value="&lt;b&gt;dq_results&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#1B5E20&quot;&gt;WHERE: bq_metadata&lt;/font&gt;&lt;br&gt;──────────────────&lt;br&gt;dq_run_id  STRING PK&lt;br&gt;run_id  STRING FK&lt;br&gt;dag_run_date  DATE&lt;br&gt;layer / table_name&lt;br&gt;rule_id  STRING&lt;br&gt;rule_name  STRING&lt;br&gt;rule_type  STRING&lt;br&gt;tier  INT64 (1/2/3)&lt;br&gt;column_name  STRING&lt;br&gt;expected_value&lt;br&gt;actual_value&lt;br&gt;records_checked&lt;br&gt;records_failed&lt;br&gt;failure_rate_pct&lt;br&gt;result  PASS/FAIL/WARN&lt;br&gt;action_taken  STRING&lt;br&gt;  HALT/CONTINUE/LOG&lt;br&gt;checked_at  TIMESTAMP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#1B5E20;fontSize=9;verticalAlign=top;align=left;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="855" y="525" width="240" height="375" as="geometry" />
+        </mxCell>
+
+        <!-- quarantine -->
+        <mxCell id="log-quar" value="&lt;b&gt;quarantine&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#E65100&quot;&gt;WHERE: bq_metadata&lt;/font&gt;&lt;br&gt;──────────────────&lt;br&gt;quarantine_id  STRING&lt;br&gt;run_id  STRING FK&lt;br&gt;dag_run_date  DATE&lt;br&gt;source_table  STRING&lt;br&gt;target_table  STRING&lt;br&gt;business_key  STRING&lt;br&gt;raw_record  JSON&lt;br&gt;dq_rule_id  STRING&lt;br&gt;failure_reason  STRING&lt;br&gt;is_resolved  BOOL&lt;br&gt;resolution_action&lt;br&gt;resolved_at  TIMESTAMP&lt;br&gt;resolved_by  STRING&lt;br&gt;quarantined_at  TIMESTAMP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FBE9E7;strokeColor=#E65100;fontSize=9;verticalAlign=top;align=left;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="1110" y="525" width="225" height="310" as="geometry" />
+        </mxCell>
+
+        <!-- reconciliation -->
+        <mxCell id="log-recon" value="&lt;b&gt;reconciliation&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#4A148C&quot;&gt;WHERE: bq_metadata&lt;/font&gt;&lt;br&gt;──────────────────&lt;br&gt;recon_id  STRING PK&lt;br&gt;run_id  STRING FK&lt;br&gt;dag_run_date  DATE&lt;br&gt;source_layer  STRING&lt;br&gt;target_layer  STRING&lt;br&gt;table_name  STRING&lt;br&gt;source_row_count&lt;br&gt;target_row_count&lt;br&gt;count_variance&lt;br&gt;count_variance_pct&lt;br&gt;source_sum_amount&lt;br&gt;target_sum_amount&lt;br&gt;sum_variance&lt;br&gt;reconciliation_status&lt;br&gt;  PASS / FAIL&lt;br&gt;checked_at  TIMESTAMP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE7F6;strokeColor=#4A148C;fontSize=9;verticalAlign=top;align=left;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="1350" y="525" width="225" height="345" as="geometry" />
+        </mxCell>
+
+        <!-- alert_log -->
+        <mxCell id="log-alert" value="&lt;b&gt;alert_log&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#880E4F&quot;&gt;WHERE: bq_metadata&lt;/font&gt;&lt;br&gt;──────────────────&lt;br&gt;alert_id  STRING PK&lt;br&gt;run_id  STRING FK&lt;br&gt;alert_type  STRING&lt;br&gt;  DQ_FAIL/SLA_BREACH&lt;br&gt;  JOB_FAIL/RECON_FAIL&lt;br&gt;severity  STRING&lt;br&gt;  P1_CRITICAL..P4_INFO&lt;br&gt;layer / table_name&lt;br&gt;message  STRING&lt;br&gt;notified_via  STRING&lt;br&gt;  pagerduty/email/slack&lt;br&gt;is_acknowledged  BOOL&lt;br&gt;acknowledged_by&lt;br&gt;resolution_notes&lt;br&gt;created_at  TIMESTAMP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FCE4EC;strokeColor=#880E4F;fontSize=9;verticalAlign=top;align=left;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="1590" y="525" width="230" height="340" as="geometry" />
+        </mxCell>
+
+        <!-- schema_version -->
+        <mxCell id="log-schema" value="&lt;b&gt;schema_version&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#006064&quot;&gt;WHERE: bq_metadata&lt;/font&gt;&lt;br&gt;──────────────────&lt;br&gt;schema_id  STRING PK&lt;br&gt;table_name  STRING&lt;br&gt;version  INT64&lt;br&gt;schema_gcs_path&lt;br&gt;change_type  STRING&lt;br&gt;is_breaking_change  BOOL&lt;br&gt;approved_by  STRING&lt;br&gt;applied_at  TIMESTAMP&lt;br&gt;is_current  BOOL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F2F1;strokeColor=#006064;fontSize=9;verticalAlign=top;align=left;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="1840" y="525" width="290" height="310" as="geometry" />
+        </mxCell>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- SECTION C: Orchestration DAG Flow -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <mxCell id="orch-section" value="C.  Cloud Composer 2 — DAG Task Flow (master_pipeline_dag)" style="rounded=1;arcSize=2;fillColor=#F3E5F5;strokeColor=#6A1B9A;strokeWidth=3;fontSize=14;fontStyle=1;fontColor=#4A148C;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="50" y="935" width="2110" height="390" as="geometry" />
+        </mxCell>
+
+        <!-- DAG tasks -->
+        <mxCell id="dag-trigger" value="trigger_run&lt;br&gt;(02:00 UTC)" style="rounded=1;fillColor=#CFD8DC;strokeColor=#455A64;fontSize=9;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="70" y="970" width="120" height="50" as="geometry" /></mxCell>
+        <mxCell id="dag-cfg" value="load_config&lt;br&gt;(Read bq_metadata)" style="rounded=1;fillColor=#E8EAF6;strokeColor=#3949AB;fontSize=9;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="215" y="970" width="130" height="50" as="geometry" /></mxCell>
+        <mxCell id="dag-ingest" value="ingest_bronze&lt;br&gt;(Dataflow Flex&lt;br&gt;Template)" style="rounded=1;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=9;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="370" y="960" width="130" height="60" as="geometry" /></mxCell>
+        <mxCell id="dag-dq-b" value="dq_bronze&lt;br&gt;(Tier 1+2+3&lt;br&gt;HALT on T1)" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=9;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="525" y="960" width="120" height="60" as="geometry" /></mxCell>
+
+        <!-- Account parallel -->
+        <mxCell id="dag-a1" value="transform_acct_FXD" style="rounded=1;fillColor=#C8E6C9;strokeColor=#1B5E20;fontSize=8;" parent="1" vertex="1"><mxGeometry x="675" y="935" width="140" height="35" as="geometry" /></mxCell>
+        <mxCell id="dag-a2" value="transform_acct_FXI" style="rounded=1;fillColor=#C8E6C9;strokeColor=#1B5E20;fontSize=8;" parent="1" vertex="1"><mxGeometry x="675" y="978" width="140" height="35" as="geometry" /></mxCell>
+        <mxCell id="dag-a3" value="transform_acct_FXG" style="rounded=1;fillColor=#C8E6C9;strokeColor=#1B5E20;fontSize=8;" parent="1" vertex="1"><mxGeometry x="675" y="1021" width="140" height="35" as="geometry" /></mxCell>
+        <mxCell id="dag-a4" value="transform_acct_TNT" style="rounded=1;fillColor=#C8E6C9;strokeColor=#1B5E20;fontSize=8;" parent="1" vertex="1"><mxGeometry x="675" y="1064" width="140" height="35" as="geometry" /></mxCell>
+        <mxCell id="dag-dq-a" value="dq_account&lt;br&gt;+ recon" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=9;" parent="1" vertex="1"><mxGeometry x="840" y="980" width="110" height="50" as="geometry" /></mxCell>
+
+        <!-- Global parallel -->
+        <mxCell id="dag-g1" value="transform_global_1" style="rounded=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=8;" parent="1" vertex="1"><mxGeometry x="978" y="935" width="140" height="35" as="geometry" /></mxCell>
+        <mxCell id="dag-g2" value="transform_global_2" style="rounded=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=8;" parent="1" vertex="1"><mxGeometry x="978" y="978" width="140" height="35" as="geometry" /></mxCell>
+        <mxCell id="dag-g3" value="transform_global_3" style="rounded=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=8;" parent="1" vertex="1"><mxGeometry x="978" y="1021" width="140" height="35" as="geometry" /></mxCell>
+        <mxCell id="dag-g4" value="transform_global_4" style="rounded=1;fillColor=#BBDEFB;strokeColor=#1565C0;fontSize=8;" parent="1" vertex="1"><mxGeometry x="978" y="1064" width="140" height="35" as="geometry" /></mxCell>
+        <mxCell id="dag-dq-g" value="dq_global&lt;br&gt;+ recon" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=9;" parent="1" vertex="1"><mxGeometry x="1140" y="980" width="110" height="50" as="geometry" /></mxCell>
+
+        <!-- Facility parallel -->
+        <mxCell id="dag-f1" value="agg_facility_1" style="rounded=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=8;" parent="1" vertex="1"><mxGeometry x="1278" y="935" width="130" height="35" as="geometry" /></mxCell>
+        <mxCell id="dag-f2" value="agg_facility_2" style="rounded=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=8;" parent="1" vertex="1"><mxGeometry x="1278" y="978" width="130" height="35" as="geometry" /></mxCell>
+        <mxCell id="dag-f3" value="agg_facility_3" style="rounded=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=8;" parent="1" vertex="1"><mxGeometry x="1278" y="1021" width="130" height="35" as="geometry" /></mxCell>
+        <mxCell id="dag-f4" value="agg_facility_4" style="rounded=1;fillColor=#FFE0B2;strokeColor=#E65100;fontSize=8;" parent="1" vertex="1"><mxGeometry x="1278" y="1064" width="130" height="35" as="geometry" /></mxCell>
+        <mxCell id="dag-dq-f" value="dq_facility&lt;br&gt;+ recon" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=9;" parent="1" vertex="1"><mxGeometry x="1430" y="980" width="110" height="50" as="geometry" /></mxCell>
+
+        <!-- Country parallel -->
+        <mxCell id="dag-c1" value="rollup_country_1" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=8;" parent="1" vertex="1"><mxGeometry x="1563" y="935" width="130" height="35" as="geometry" /></mxCell>
+        <mxCell id="dag-c2" value="rollup_country_2" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=8;" parent="1" vertex="1"><mxGeometry x="1563" y="978" width="130" height="35" as="geometry" /></mxCell>
+        <mxCell id="dag-c3" value="rollup_country_3" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=8;" parent="1" vertex="1"><mxGeometry x="1563" y="1021" width="130" height="35" as="geometry" /></mxCell>
+        <mxCell id="dag-c4" value="rollup_country_4" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=8;" parent="1" vertex="1"><mxGeometry x="1563" y="1064" width="130" height="35" as="geometry" /></mxCell>
+        <mxCell id="dag-dq-c" value="dq_country&lt;br&gt;final recon" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=9;" parent="1" vertex="1"><mxGeometry x="1715" y="980" width="110" height="50" as="geometry" /></mxCell>
+
+        <!-- Complete -->
+        <mxCell id="dag-complete" value="pipeline_complete&lt;br&gt;Pub/Sub event&lt;br&gt;Summary email" style="rounded=1;fillColor=#A5D6A7;strokeColor=#1B5E20;fontSize=9;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="1855" y="970" width="130" height="60" as="geometry" /></mxCell>
+
+        <!-- DAG arrows (simplified chains) -->
+        <mxCell id="e-dag-1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#455A64;" edge="1" source="dag-trigger" target="dag-cfg" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#455A64;" edge="1" source="dag-cfg" target="dag-ingest" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-3" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#455A64;" edge="1" source="dag-ingest" target="dag-dq-b" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-4a" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;" edge="1" source="dag-dq-b" target="dag-a1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-4b" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;" edge="1" source="dag-dq-b" target="dag-a2" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-4c" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;" edge="1" source="dag-dq-b" target="dag-a3" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-4d" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;" edge="1" source="dag-dq-b" target="dag-a4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-5a" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;" edge="1" source="dag-a1" target="dag-dq-a" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-5b" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;" edge="1" source="dag-a4" target="dag-dq-a" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-6a" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1565C0;" edge="1" source="dag-dq-a" target="dag-g1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-6d" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1565C0;" edge="1" source="dag-dq-a" target="dag-g4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-7a" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1565C0;" edge="1" source="dag-g1" target="dag-dq-g" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-7d" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1565C0;" edge="1" source="dag-g4" target="dag-dq-g" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-8a" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;" edge="1" source="dag-dq-g" target="dag-f1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-8d" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;" edge="1" source="dag-dq-g" target="dag-f4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-9a" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;" edge="1" source="dag-f1" target="dag-dq-f" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-9d" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;" edge="1" source="dag-f4" target="dag-dq-f" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-10a" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#B71C1C;" edge="1" source="dag-dq-f" target="dag-c1" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-10d" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#B71C1C;" edge="1" source="dag-dq-f" target="dag-c4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-11a" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#B71C1C;" edge="1" source="dag-c1" target="dag-dq-c" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-11d" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#B71C1C;" edge="1" source="dag-c4" target="dag-dq-c" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-dag-12" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;strokeWidth=2;" edge="1" source="dag-dq-c" target="dag-complete" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- Retry config callout -->
+        <mxCell id="retry-note" value="&lt;b&gt;Airflow Retry Config:&lt;/b&gt;&lt;br&gt;retries = 3&lt;br&gt;retry_delay = 5 min&lt;br&gt;exponential_backoff = True&lt;br&gt;max_retry_delay = 60 min&lt;br&gt;email_on_failure = True&lt;br&gt;sla = 4 hours" style="rounded=1;fillColor=#FFFDE7;strokeColor=#F57F17;fontSize=9;align=left;" parent="1" vertex="1">
+          <mxGeometry x="70" y="1145" width="200" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="sla-note" value="&lt;b&gt;SLA Miss → Pub/Sub Alert&lt;/b&gt;&lt;br&gt;Cloud Monitoring policy fires&lt;br&gt;if DAG run &gt; sla_hours&lt;br&gt;(defined per table in table_config)&lt;br&gt;→ alert_log INSERT&lt;br&gt;→ PagerDuty P2" style="rounded=1;fillColor=#FCE4EC;strokeColor=#C62828;fontSize=9;align=left;" parent="1" vertex="1">
+          <mxGeometry x="290" y="1145" width="220" height="115" as="geometry" />
+        </mxCell>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!-- SECTION D: Reinstatement Logic -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <mxCell id="reinstate-section" value="D.  Reinstatement Logic — sp_reinstate_pipeline + reinstate_pipeline_dag" style="rounded=1;arcSize=2;fillColor=#FFF8E1;strokeColor=#F57F17;strokeWidth=3;fontSize=14;fontStyle=1;fontColor=#E65100;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="50" y="1350" width="2110" height="550" as="geometry" />
+        </mxCell>
+
+        <!-- Reinstatement flow steps -->
+        <mxCell id="r1" value="1. DETECT FAILURE&lt;br&gt;on_failure_callback&lt;br&gt;OR monitoring alert&lt;br&gt;OR manual trigger" style="rounded=1;fillColor=#FFCC80;strokeColor=#E65100;fontSize=9;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="70" y="1390" width="165" height="75" as="geometry" /></mxCell>
+        <mxCell id="r2" value="2. QUERY pipeline_runs&lt;br&gt;Find: failed run_id,&lt;br&gt;layer, table_name,&lt;br&gt;watermark_start,&lt;br&gt;attempt_number" style="rounded=1;fillColor=#FFCC80;strokeColor=#E65100;fontSize=9;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="265" y="1390" width="165" height="75" as="geometry" /></mxCell>
+        <mxCell id="r3" value="3. CHECK BUDGET&lt;br&gt;attempt &lt; max_retry?&lt;br&gt;YES → auto retry&lt;br&gt;NO → HALT +&lt;br&gt;P1 alert" style="rounded=1;fillColor=#FFCC80;strokeColor=#E65100;fontSize=9;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="460" y="1390" width="165" height="75" as="geometry" /></mxCell>
+        <mxCell id="r4" value="4. DELETE PARTITION&lt;br&gt;BQ DELETE WHERE&lt;br&gt;processing_date =&lt;br&gt;run_date&lt;br&gt;(idempotent)" style="rounded=1;fillColor=#FFCC80;strokeColor=#E65100;fontSize=9;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="655" y="1390" width="165" height="75" as="geometry" /></mxCell>
+        <mxCell id="r5" value="5. NEW run_id&lt;br&gt;INSERT pipeline_runs&lt;br&gt;status=RUNNING&lt;br&gt;attempt_number++&lt;br&gt;parent_run_id=orig" style="rounded=1;fillColor=#FFCC80;strokeColor=#E65100;fontSize=9;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="850" y="1390" width="165" height="75" as="geometry" /></mxCell>
+        <mxCell id="r6" value="6. RERUN TASK&lt;br&gt;Same watermark_start&lt;br&gt;Airflow TriggerDag&lt;br&gt;or BQ job submit" style="rounded=1;fillColor=#FFCC80;strokeColor=#E65100;fontSize=9;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="1045" y="1390" width="165" height="75" as="geometry" /></mxCell>
+        <mxCell id="r7" value="7. LOG RESULT&lt;br&gt;UPDATE pipeline_runs&lt;br&gt;status=SUCCESS/FAILED&lt;br&gt;completed_at, bq_job_id&lt;br&gt;watermark_end" style="rounded=1;fillColor=#FFCC80;strokeColor=#E65100;fontSize=9;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="1240" y="1390" width="165" height="75" as="geometry" /></mxCell>
+        <mxCell id="r8" value="8. RESUME DOWNSTREAM&lt;br&gt;Airflow clears blocked&lt;br&gt;tasks per depends_on&lt;br&gt;in table_config&lt;br&gt;Pipeline continues" style="rounded=1;fillColor=#A5D6A7;strokeColor=#1B5E20;fontSize=9;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="1435" y="1390" width="165" height="75" as="geometry" /></mxCell>
+        <mxCell id="r-halt" value="HALT PATH&lt;br&gt;Max retries exhausted&lt;br&gt;INSERT alert_log P1&lt;br&gt;Pub/Sub → PagerDuty&lt;br&gt;Manual intervention" style="rounded=1;fillColor=#FFCDD2;strokeColor=#B71C1C;fontSize=9;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="460" y="1510" width="165" height="75" as="geometry" /></mxCell>
+
+        <mxCell id="e-r12" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=2;" edge="1" source="r1" target="r2" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-r23" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=2;" edge="1" source="r2" target="r3" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-r34" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=2;" edge="1" source="r3" target="r4" parent="1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="542" y="1490"/><mxPoint x="738" y="1490"/></Array></mxGeometry></mxCell>
+        <mxCell id="e-r45" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=2;" edge="1" source="r4" target="r5" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-r56" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=2;" edge="1" source="r5" target="r6" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-r67" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#E65100;strokeWidth=2;" edge="1" source="r6" target="r7" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-r78" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#1B5E20;strokeWidth=2;" edge="1" source="r7" target="r8" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e-r3h" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#B71C1C;strokeWidth=2;dashed=1;" edge="1" source="r3" target="r-halt" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <!-- Partial Layer Reinstatement table -->
+        <mxCell id="partial-title" value="&lt;b&gt;Partial Layer Reinstatement Scope&lt;/b&gt;" style="text;html=1;fillColor=none;strokeColor=none;fontSize=12;fontStyle=1;fontColor=#1A56A0;" parent="1" vertex="1"><mxGeometry x="70" y="1610" width="400" height="25" as="geometry" /></mxCell>
+        <mxCell id="p-hdr" value="Layer That Failed" style="rounded=1;fillColor=#1A56A0;strokeColor=#1A56A0;fontColor=#fff;fontSize=10;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="70" y="1638" width="195" height="30" as="geometry" /></mxCell>
+        <mxCell id="p-hdr2" value="Layers to Reinstate (in order)" style="rounded=1;fillColor=#1A56A0;strokeColor=#1A56A0;fontColor=#fff;fontSize=10;fontStyle=1;" parent="1" vertex="1"><mxGeometry x="270" y="1638" width="420" height="30" as="geometry" /></mxCell>
+        <mxCell id="p1a" value="Bronze (Ingestion)" style="rounded=1;fillColor=#FFEBEE;strokeColor=#B71C1C;fontSize=9;" parent="1" vertex="1"><mxGeometry x="70" y="1673" width="195" height="28" as="geometry" /></mxCell>
+        <mxCell id="p1b" value="Bronze → Account → Global → Facility → Country  (ALL 5 layers)" style="rounded=1;fillColor=#FFEBEE;strokeColor=#B71C1C;fontSize=9;align=left;" parent="1" vertex="1"><mxGeometry x="270" y="1673" width="420" height="28" as="geometry" /></mxCell>
+        <mxCell id="p2a" value="Silver — Account" style="rounded=1;fillColor=#FFF3E0;strokeColor=#E65100;fontSize=9;" parent="1" vertex="1"><mxGeometry x="70" y="1706" width="195" height="28" as="geometry" /></mxCell>
+        <mxCell id="p2b" value="Account → Global → Facility → Country  (4 layers)" style="rounded=1;fillColor=#FFF3E0;strokeColor=#E65100;fontSize=9;align=left;" parent="1" vertex="1"><mxGeometry x="270" y="1706" width="420" height="28" as="geometry" /></mxCell>
+        <mxCell id="p3a" value="Silver — Global" style="rounded=1;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=9;" parent="1" vertex="1"><mxGeometry x="70" y="1739" width="195" height="28" as="geometry" /></mxCell>
+        <mxCell id="p3b" value="Global → Facility → Country  (3 layers)" style="rounded=1;fillColor=#FFF9C4;strokeColor=#F9A825;fontSize=9;align=left;" parent="1" vertex="1"><mxGeometry x="270" y="1739" width="420" height="28" as="geometry" /></mxCell>
+        <mxCell id="p4a" value="Gold — Facility" style="rounded=1;fillColor=#F1F8E9;strokeColor=#33691E;fontSize=9;" parent="1" vertex="1"><mxGeometry x="70" y="1772" width="195" height="28" as="geometry" /></mxCell>
+        <mxCell id="p4b" value="Facility → Country  (2 layers)" style="rounded=1;fillColor=#F1F8E9;strokeColor=#33691E;fontSize=9;align=left;" parent="1" vertex="1"><mxGeometry x="270" y="1772" width="420" height="28" as="geometry" /></mxCell>
+        <mxCell id="p5a" value="Gold — Country" style="rounded=1;fillColor=#E8F5E9;strokeColor=#1B5E20;fontSize=9;" parent="1" vertex="1"><mxGeometry x="70" y="1805" width="195" height="28" as="geometry" /></mxCell>
+        <mxCell id="p5b" value="Country only  (1 layer — skip all upstream)" style="rounded=1;fillColor=#E8F5E9;strokeColor=#1B5E20;fontSize=9;align=left;" parent="1" vertex="1"><mxGeometry x="270" y="1805" width="420" height="28" as="geometry" /></mxCell>
+
+        <!-- Watermark Strategy -->
+        <mxCell id="wm-box" value="&lt;b&gt;Watermark Checkpoint Strategy&lt;/b&gt;&lt;br&gt;──────────────────────────────────────────────&lt;br&gt;START of run: SELECT MAX(watermark_end) FROM pipeline_runs&lt;br&gt;    WHERE table_name=@tbl AND status='SUCCESS'&lt;br&gt;    ORDER BY dag_run_date DESC LIMIT 1;&lt;br&gt;&lt;br&gt;Dataflow reads: WHERE updated_at &gt; watermark_start&lt;br&gt;                 AND updated_at &lt;= CURRENT_TIMESTAMP()&lt;br&gt;&lt;br&gt;END of run (SUCCESS only):&lt;br&gt;  UPDATE pipeline_runs SET watermark_end=@max_seen, status='SUCCESS'&lt;br&gt;&lt;br&gt;FAILURE: watermark_end never written → next rerun uses same watermark_start&lt;br&gt;         (prevents data gaps AND prevents duplicates)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#1B5E20;fontSize=9;verticalAlign=top;align=left;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="730" y="1600" width="700" height="240" as="geometry" />
+        </mxCell>
+
+        <!-- DQ Framework detail -->
+        <mxCell id="dq-detail" value="&lt;b&gt;DQ Framework — Rule Tiers&lt;/b&gt;&lt;br&gt;──────────────────────────────────────&lt;br&gt;TIER 1 — CRITICAL (action: HALT)&lt;br&gt;  Null checks on PKs, row count &gt; 0,&lt;br&gt;  schema match, duplicate PKs&lt;br&gt;  → Stop pipeline, P1 alert, quarantine batch&lt;br&gt;&lt;br&gt;TIER 2 — WARNING (action: CONTINUE)&lt;br&gt;  Referential integrity, null rates,&lt;br&gt;  value range checks&lt;br&gt;  → Log to dq_results, flag records&lt;br&gt;&lt;br&gt;TIER 3 — INFORMATIONAL (action: LOG_ONLY)&lt;br&gt;  Statistical drift, cardinality checks&lt;br&gt;  → Trend dashboard only&lt;br&gt;&lt;br&gt;Rules stored in:&lt;br&gt;  gs://[proj]-config/dq-rules/&lt;br&gt;  bronze_rules.yaml&lt;br&gt;  silver_account_rules.yaml&lt;br&gt;  silver_global_rules.yaml&lt;br&gt;  gold_facility_rules.yaml&lt;br&gt;  gold_country_rules.yaml" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFDE7;strokeColor=#F57F17;fontSize=9;verticalAlign=top;align=left;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="1460" y="1390" width="300" height="460" as="geometry" />
+        </mxCell>
+
+        <!-- Terraform placement guide -->
+        <mxCell id="tf-guide" value="&lt;b&gt;Terraform Resource Placement&lt;/b&gt;&lt;br&gt;──────────────────────────────────────────&lt;br&gt;bq_metadata dataset       → modules/bigquery/datasets.tf&lt;br&gt;All metadata tables       → modules/bigquery/metadata_tables.tf&lt;br&gt;sp_reinstate_pipeline     → modules/bigquery/routines.tf&lt;br&gt;Silver/Gold datasets      → modules/bigquery/datasets.tf&lt;br&gt;GCS buckets               → modules/gcs/buckets.tf&lt;br&gt;Cloud Composer env        → modules/composer/environment.tf&lt;br&gt;Dataflow Flex Templates   → modules/dataflow/templates.tf&lt;br&gt;Cloud Monitoring alerts   → modules/monitoring/alert_policies.tf&lt;br&gt;Secret Manager secrets    → modules/security/secrets.tf&lt;br&gt;IAM bindings              → modules/iam/bindings.tf&lt;br&gt;Cloud Build triggers      → modules/cicd/cloudbuild.tf" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EAF6;strokeColor=#3949AB;fontSize=9;verticalAlign=top;align=left;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="1790" y="1390" width="360" height="460" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+</mxfile>
