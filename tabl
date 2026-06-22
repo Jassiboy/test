@@ -1,0 +1,48 @@
+cdl_table_config		
+		
+Column Name	Data Type	Description
+table_id	STRING	Unique logical ID (e.g., acc_t1_to_fac_t1) [1].
+source_system	STRING	Source system name (e.g., ACCOUNT_DB) [1].
+source_table_name	STRING	Physical source table name (e.g., acc_t1) [1].
+target_system	STRING	Target platform (e.g., SNOWFLAKE, DELTA_LAKE) [1].
+target_table_name	STRING	Physical target table name (e.g., fac_t1) [1].
+target_dataset_layer	STRING	Target layer (e.g., BRONZE, SILVER, FACILITY) [1].
+opco	STRING	Ground/frieght/international
+ingestion_mode	STRING	FULL, INCR, or CDC [1].
+watermark_column	STRING	Column name to track delta (e.g., last_modified_ts) [1].
+partition_col	STRING	Column name used to partition target data (e.g., load_date).
+is_active	BOOL	Toggle to enable/disable pipeline runs [1].
+data_quality_rules	JSON / TEXT	Validation rules config in JSON format [1].
+created_at	TIMESTAMP	Record insertion timestamp [1].
+		
+======================================
+
+cdl_table_run_log		
+		
+Column Name	Data Type	Description
+run_id	STRING	SHA-256 Hash of dag_id + execution_date.
+dataset_id	STRING	Logical identifier for the pipeline mapping.
+dag_run_date	DATE	Logical processing date (Airflow execution date as DATE).
+dag_id	STRING	Airflow DAG Identifier.
+task_id	STRING	Airflow Task Identifier.
+dataset_layer	STRING	E.g., ACCOUNT (Source), FACILITY (Target).
+opco	STRING	Ground/frieght/international
+table_name	STRING	Name of the table being processed.
+status	STRING	RUNNING, SUCCESS, FAILED, SKIPPED, HALTED.
+attempt_number	INT64	Task retry attempt sequence (starts at 1).
+rows_read	INT64	Records scanned from the source.
+rows_written	INT64	Total records committed to the destination.
+rows_rejected	INT64	Records failing inline DQ rules.
+rows_merged	INT64	Merged records (for Upsert logic).
+rows_inserted	INT64	Newly inserted records.
+rows_updated	INT64	Updated records.
+rows_deleted	INT64	Deleted records.
+watermark_start	TIMESTAMP	Starting watermark (low-watermark).
+watermark_end	TIMESTAMP	Ending watermark (high-watermark).
+started_at	TIMESTAMP	System clock time when execution began.
+completed_at	TIMESTAMP	System clock time when execution finished.
+dq_results	JSON / TEXT	Structured JSON payload of DQ checks run.
+error_code	STRING	Standardized error categorization code.
+error_message	TEXT / STRING	Full stack trace / exception details.
+updated_at	TIMESTAMP	System time when this row was last altered.
+created_at	TIMESTAMP	Record creation timestamp (defaults to current time).
