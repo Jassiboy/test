@@ -1,148 +1,29 @@
-"""
-dq_rules.py
-=============
-One function per `dq_rule` name that shows up in
-cdl_table_config.data_quality_rules, e.g.:
-
-    [{ "dq_rule": "dq_net_rev", "error_threshold_pct": 0.0 }]
-
-The framework (run_dq_on_stage, in 01_framework_core.py) looks up each rule
-by name in this file and calls it — you don't touch the framework to add a
-new rule, you just add a function here with a matching name.
-
-CONTRACT every rule function must follow:
-    fn(spark, stage_table: str, source_table: str, opco: str, load_mnth: str) -> float
-
-    Returns a diff_pct: how far apart stage and source are on whatever
-    metric this rule checks (0.0 = identical). The framework compares this
-    return value to the rule's error_threshold_pct — the rule function
-    itself doesn't decide pass/fail, it just measures.
-"""
-
-
-def _pct_diff(expected, actual) -> float:
-    """Shared helper: % difference between an expected and actual value."""
-    if expected in (None, 0):
-        return 0.0 if actual in (None, 0) else 100.0
-    return abs(float(expected) - float(actual)) / float(expected) * 100
-
-
-def _scalar(spark, sql: str):
-    return spark.sql(sql).collect()[0][0]
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Row count — stage vs source, same (opco, load_mnth) scope
-# ─────────────────────────────────────────────────────────────────────────────
-def dq_row_count(spark, stage_table, source_table, opco, load_mnth) -> float:
-    scope = f"opco = '{opco}' AND load_mnth = '{load_mnth}'"
-    stage_cnt  = _scalar(spark, f"SELECT COUNT(*) FROM {stage_table}  WHERE {scope}")
-    source_cnt = _scalar(spark, f"SELECT COUNT(*) FROM {source_table} WHERE {scope}")
-    return _pct_diff(source_cnt, stage_cnt)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Net revenue — example business-metric rule (matches the config example)
-# ─────────────────────────────────────────────────────────────────────────────
-def dq_net_rev(spark, stage_table, source_table, opco, load_mnth) -> float:
-    scope = f"opco = '{opco}' AND load_mnth = '{load_mnth}'"
-    stage_rev  = _scalar(spark, f"SELECT SUM(net_revenue) FROM {stage_table}  WHERE {scope}") or 0
-    source_rev = _scalar(spark, f"SELECT SUM(net_revenue) FROM {source_table} WHERE {scope}") or 0
-    return _pct_diff(source_rev, stage_rev)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Add more rules the same way, e.g.:
-#
-# def dq_distinct_accounts(spark, stage_table, source_table, opco, load_mnth) -> float:
-#     scope = f"opco = '{opco}' AND load_mnth = '{load_mnth}'"
-#     stage_ct  = _scalar(spark, f"SELECT COUNT(DISTINCT account_id) FROM {stage_table}  WHERE {scope}")
-#     source_ct = _scalar(spark, f"SELECT COUNT(DISTINCT account_id) FROM {source_table} WHERE {scope}")
-#     return _pct_diff(source_ct, stage_ct)
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-
-==========
-"""
-Add this to notebooks/01_framework_core.py.
-
-Reads cfg.dq_rules (parsed from cdl_table_config.data_quality_rules, e.g.
-[{ "dq_rule": "dq_net_rev", "error_threshold_pct": 0.0 }]) and runs each
-named rule — found by name in dq_rules.py — against the stage table vs the
-source table, for one month.
-"""
-
-import importlib
-from pyspark.sql import SparkSession
-
-_dq_rules_module = None  # loaded lazily, cached after first use
-
-
-def run_dq_on_stage(cfg: "TableConfig", opco: str, load_mnth: str,
-                     stage_table: str, source_table: str) -> tuple[bool, list[dict]]:
-    """
-    Run every rule in cfg.dq_rules against (stage_table, source_table) for
-    this (opco, load_mnth). Returns (all_rules_passed, per_rule_results).
-
-    Each rule dict looks like {"dq_rule": "dq_net_rev", "error_threshold_pct": 0.0}.
-    `dq_rule` is the function name to look up in dq_rules.py; the framework
-    calls it and compares its returned diff_pct to error_threshold_pct — the
-    rule function itself only measures, it doesn't decide pass/fail.
-    """
-    global _dq_rules_module
-    if _dq_rules_module is None:
-        _dq_rules_module = importlib.import_module("dq_rules")
-
-    if not cfg.dq_rules:
-        return True, []
-
-    spark = SparkSession.getActiveSession()
-    results = []
-    overall_ok = True
-
-    for rule in cfg.dq_rules:
-        rule_name = rule["dq_rule"]
-        threshold = float(rule.get("error_threshold_pct", 0.0))
-        fn = getattr(_dq_rules_module, rule_name, None)
-
-        if fn is None:
-            log("ERROR", f"DQ rule '{rule_name}' not found in dq_rules.py", table=cfg.table_id)
-            results.append({"dq_rule": rule_name, "threshold_pct": threshold,
-                             "diff_pct": None, "passed": False, "error": "rule not found"})
-            overall_ok = False
-            continue
-
-        try:
-            diff_pct = fn(spark, stage_table, source_table, opco, load_mnth)
-            passed = diff_pct <= threshold
-        except Exception as exc:
-            log("ERROR", f"DQ rule '{rule_name}' raised: {exc}", table=cfg.table_id)
-            diff_pct, passed = None, False
-
-        results.append({"dq_rule": rule_name, "threshold_pct": threshold,
-                         "diff_pct": diff_pct, "passed": passed})
-        overall_ok = overall_ok and passed
-
-    return overall_ok, results
-
-========
-import time
-import traceback
-from datetime import date, datetime, timezone
-
-from pyspark.sql import SparkSession
-from delta.tables import DeltaTable
-
-# from wherever these already live in your project:
-# read_table_configs, get_transformed_df, make_run_id, log, log_start,
-# log_success, log_failure, run_dq_on_stage, DATA_DB
+run_batch_id:string
+log_timet:timestamp
+opco:string
+dataset_layer:string
+table_name:string
+load_process:string
+load_mnth_start:string
+load_mnth_end:string
+status:string
+message:string
+attempt_number:integer
+watermark_start:timestamp
+watermark_end:timestamp
+started_at:timestamp
+completed_at:timestamp
+duration_seconds:integer,
+rows_read:long
+rows_written:long
+dq_result:String
+dq_message:String
 
 
 def run_layer(
-    dag_id: str, opco: str, layer: str, run_date: date, skip_gate: bool,
+    run_batch_id: str, opco: str, layer: str, run_date: date, skip_gate: bool,
     table_id: list[str],
-    windows: list[int],
+    start_date: Optional[date] = None, end_date: Optional[date] = None, stage: Optional[str] = "False"
 ) -> bool:
     """
     For every table in table_id:
@@ -165,8 +46,25 @@ def run_layer(
             return False
 
     for cfg in configs:
-        stage_table  = f"{DATA_DB}.{cfg.target_table_name}_stage"
-        source_table = f"{cfg.source_system}.{cfg.source_table_name}"
+        windows = [] if start_date is None else month_chunks(int(start_date), int(end_date))
+        mode = "incremental" if start_date is None else "monthly_backfill"
+
+        run_date = date.today()
+        log("INFO", "═" * 55)
+        # log("INFO", f"OPCO={opco} | {mode} | tables={table_names or 'ALL'} | groups={groups}")
+        
+        if mode == 'incremental':
+            #incremental logic
+            current_month_str = run_date.strftime("%Y%m")
+            if run_date.day <= cfg.incremental_cutoff_day:
+                prev_month_date = run_date - relativedelta(months=1)
+                prev_month_str = prev_month_date.strftime("%Y%m")
+                windows = [prev_month_str, current_month_str]
+            else:
+                windows = [current_month_str]
+
+        temp_table  = f"{DATA_DB}.{cfg.target_table_name}_temp"
+        source_table = f"{cfg.source_system}.{cfg.source_table}"
 
         _reset_stage(stage_table)
 
@@ -212,12 +110,12 @@ def run_ingestion(
     failure is a verdict, not a transient error, so it does NOT retry).
     """
     target = f"{DATA_DB}.{cfg.target_table_name}"
-    scope  = f"opco = '{opco}' AND load_mnth = '{load_mnth}'"
+    scope  = f"ratemnth = '{load_mnth}'"
 
-    for attempt in range(1, cfg.retry_max_attempts + 1):
+    for attempt in range(1, retry_max_attempts + 1):
         started_at = datetime.now(timezone.utc)
         run_id = make_run_id(dag_id, cfg.table_id, load_mnth, attempt)
-        log("INFO", f"DQ + promote [{load_mnth}] attempt {attempt}/{cfg.retry_max_attempts}",
+        log("INFO", f"DQ + promote [{load_mnth}] attempt {attempt}/{retry_max_attempts}",
             table=cfg.table_id, run_id=run_id)
         log_start(run_id, cfg, run_date, dag_id, attempt)
 
@@ -241,7 +139,7 @@ def run_ingestion(
 
         except Exception as exc:
             msg     = f"{type(exc).__name__}: {exc}\n{traceback.format_exc()}"
-            is_last = attempt == cfg.retry_max_attempts
+            is_last = attempt == retry_max_attempts
             log("ERROR", f"Attempt {attempt} failed: {exc}", table=cfg.table_id)
             log_failure(run_id, started_at, "UNHANDLED_EXCEPTION",
                         msg, status="FAILED" if is_last else "RUNNING")
@@ -249,30 +147,99 @@ def run_ingestion(
                 # _alerter.send(cfg, run_id, "FAILED", msg, "CRITICAL")
                 return False
 
-        wait = min(cfg.retry_wait_sec * (cfg.retry_backoff ** (attempt - 1)), cfg.retry_max_wait)
-        log("INFO", f"Retrying in {wait:.0f}s …")
-        time.sleep(wait)
+        log("INFO", f"Retrying in {10:.0f}s …")
+        time.sleep(10)
 
     return False
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────────────────────────────────────
-def _reset_stage(stage_table: str):
+    =========================================
+    
+def log_start(
+    run_id: str,
+    cfg: TableConfig,
+    run_date: date,
+    dag_id: str,
+    attempt: int,
+    watermark_start: Optional[datetime] = None,
+):
     spark = SparkSession.getActiveSession()
-    if DeltaTable.isDeltaTable(spark, stage_table):
-        spark.sql(f"TRUNCATE TABLE {stage_table}")
-        log("INFO", f"Truncated {stage_table}")
+    now = datetime.now(timezone.utc).isoformat()
+    row = {
+        "run_id": run_id, "dataset_id": cfg.table_id,
+        "dag_run_date": str(run_date), "dag_id": dag_id,
+        "task_id": cfg.table_id, "dataset_layer": cfg.target_dataset_layer,
+        "opco": cfg.opco, "table_name": cfg.target_table_name,
+        "status": "RUNNING", "attempt_number": attempt,
+        "rows_read": None, "rows_written": None, "rows_rejected": None,
+        "rows_merged": None, "rows_inserted": None, "rows_updated": None,
+        "rows_deleted": None,
+        "watermark_start": watermark_start.isoformat() if watermark_start else None,
+        "watermark_end": None, "started_at": now, "completed_at": None,
+        "duration_seconds": None, "dq_results": None, "dq_passed": None,
+        "error_code": None, "error_message": None,
+        "spark_app_id": spark.sparkContext.applicationId,
+        "cluster_id": os.getenv("CLUSTER_ID", "unknown"),
+        "created_at": now, "updated_at": now,
+    }
+    _upsert_run_log(row)
 
 
-def _promote_to_target(cfg: "TableConfig", target: str, stage_table: str, scope: str) -> int:
-    """Atomic overwrite of just this month's partition in target, from stage."""
+def log_success(
+    run_id: str,
+    started_at: datetime,
+    rows_read: int,
+    rows_written: int,
+    rows_rejected: int,
+    dq_results: list,
+    dq_passed: bool,
+    watermark_end: Optional[datetime] = None,
+):
+    now      = datetime.now(timezone.utc)
+    duration = int((now - started_at).total_seconds())
     spark = SparkSession.getActiveSession()
-    stage_df = spark.table(stage_table).where(scope)
-    (stage_df.write.format("delta").mode("overwrite")
-        .option("replaceWhere", scope)
-        .saveAsTable(target))
-    ct = stage_df.count()
-    log("INFO", f"Promoted {scope} → {target}: {ct} rows", table=cfg.table_id)
-    return ct
+    safe_dq  = json.dumps(dq_results).replace("'", "\\'")
+    spark.sql(f"""
+        UPDATE {METADATA_DB}.cdl_table_run_log
+        SET status='SUCCESS', rows_read={rows_read}, rows_written={rows_written},
+            rows_rejected={rows_rejected}, completed_at='{now.isoformat()}',
+            duration_seconds={duration},
+            dq_results='{safe_dq}',
+            dq_passed={str(dq_passed)},
+            watermark_end={'NULL' if not watermark_end else f"'{watermark_end.isoformat()}'"},
+            updated_at='{now.isoformat()}'
+        WHERE run_id='{run_id}'
+    """)
+
+
+def log_failure(
+    run_id: str,
+    started_at: Optional[datetime],
+    error_code: str,
+    error_message: str,
+    status: str = "FAILED",
+):
+    now      = datetime.now(timezone.utc)
+    duration = int((now - started_at).total_seconds()) if started_at else 0
+    spark = SparkSession.getActiveSession()
+    safe_msg = error_message[:2000].replace("'", "\\'")
+    spark.sql(f"""
+        UPDATE {METADATA_DB}.cdl_table_run_log
+        SET status='{status}', completed_at='{now.isoformat()}',
+            duration_seconds={duration}, dq_passed=false,
+            error_code='{error_code}', error_message='{safe_msg}',
+            updated_at='{now.isoformat()}'
+        WHERE run_id='{run_id}'
+    """)
+
+
+def _upsert_run_log(row: dict):
+    spark = SparkSession.getActiveSession()
+    try:
+        df = spark.createDataFrame([row])
+        DeltaTable.forName(spark, f"{METADATA_DB}.cdl_table_run_log").alias("t").merge(
+            df.alias("s"),
+            "t.run_id = s.run_id AND t.attempt_number = s.attempt_number"
+        ).whenNotMatchedInsertAll().execute()
+    except Exception as e:
+        log("ERROR", f"Failed to write run log: {e}")
