@@ -1,47 +1,76 @@
+Please make the following updates to the presentation:
 
-====SLIDE 2=====================================================
-Feature it brings:-
-1.table_id is generated with combination of target_table and it's load process, it basically help to distinct process if it is loading up to same target table		
-2.source_tables = all source table info					
-3.incremental_cutoff_day:- so currently we are following 9 th of the month to do the truncate and load in incremental process, but it flexiable in nature and can be chnages for different table depend on the need.		
-4.watermark column:- watercolumn is good to have for incremental process, for futture nedd			
-5.DQ Rule:- A multiple DQ rule can be set [{"dq_rule": "dq_net_rev", "error_threshold_pct": 0.0}] so that whenever data I sloaded from source it can validateed for each
-6.DQ-sttus:-  for tuning it on//off as per the need
+### 1. Update Slide 4 – Add an "Additional Features" Section
 
+On the right-hand side of Slide 4, add a new section titled **"Additional Features"**. Include the following capabilities:
 
-====SLIDE 3=====================================================
-A dedicated log table for audit and monitoring puprose, some of the important column featuers is hsown here:-
+1. **Fully Parameterized Framework**
 
-Feature:- 
-1. FOr each table_process detail ata granular level.
-2. Status - SUCCESS/PARTIAL_SUCCESS/FAILED (partial_success, if some month loaded some failed so that we do not need to load successful months again)
-3.Dq _results for each proceess
-4. Excutipn summary-- Each months log details
+   * The framework is completely parameter-driven.
+   * Users only need to pass the required **Table ID(s)**, and the entire processing pipeline is automatically executed for the selected tables.
 
+2. **Stage Table Support**
 
-=========SLIDE4=============QA and perfomance:- 
+   * The framework provides an **`is_stage_table`** parameter.
+   * When enabled, data is loaded into a staging or temporary table instead of the final target table.
+   * This is useful for testing, validation, and debugging without impacting production data.
 
-Performance
-============================
-Loaded 3 months of data:-
-acct to fac--- >202501 to 202503---- took 19 minutes ~~ 6-8 per month (Ground +smartpost)
+3. **Flexible Load Configuration**
 
-Traditional MKVW_loadting from acc_to fac  ---takes 
-FXG:  20 -30 mins per month
-FXG (smartpost):  15 - 20  mins per month
+   * Users can specify the **Start Month** and **Load Month** either through runtime parameters or via the metadata/configuration tables.
+   * This provides flexibility for backfills, incremental loads, and scheduled executions.
 
-From MKVW FACT_to AZURE fact(ADF/abinitio)
-30 min per months
+4. **Cloud-Agnostic Design**
 
-STRESS TESTING:- 
-loaded 3 year of data ---
-acct to fact -- 1hr 28min (Ground +smartpost)
-From MKVW FACT_to AZURE fact(ADF/abinitio) == 40 hr
+   * The framework is designed to be cloud agnostic.
+   * The architecture and codebase can be migrated with minimal effort between cloud platforms such as **Azure** and **Google Cloud Platform (GCP)**.
 
-==============================
-QA:- 
+Present these features using visually appealing callout boxes, icons, or SmartArt rather than plain bullet points.
 
-All thekpis for the tbale has been validated
+---
 
-however 
+### 2. Add a New Slide After the Performance Slide (Slide 6)
+
+Create a new slide titled:
+
+**Performance Optimization Strategy – Parallel Processing Architecture**
+
+The purpose of this slide is to visually explain how the framework achieves significant performance improvements through parallel execution.
+
+Use a professional flow diagram instead of paragraphs.
+
+The flow should illustrate the following example:
+
+* The user provides multiple **Table IDs** as input (use two sample Table IDs for illustration).
+* The framework uses **Python ThreadPoolExecutor** to create parallel threads for each Table ID.
+* For each Table ID, if the execution range is **202501–202503**, the framework further creates parallel child threads so that each month is processed independently.
+* As a result:
+
+  * Multiple tables are processed concurrently.
+  * Multiple months for each table are also processed concurrently.
+  * The overall execution time is significantly reduced.
+
+The diagram should clearly represent this hierarchy, for example:
+
+```
+Input Parameters
+      │
+      ├── Table ID 101
+      │      ├── 202501
+      │      ├── 202502
+      │      └── 202503
+      │
+      └── Table ID 102
+             ├── 202501
+             ├── 202502
+             └── 202503
+```
+
+Indicate that:
+
+* The first level of parallelism is across **Table IDs**.
+* The second level of parallelism is across **Months** for each Table ID.
+* This nested parallel execution maximizes resource utilization and minimizes overall processing time.
+
+Use professional colors, icons, arrows, and flowchart elements so the slide is visually engaging and easy to understand for both technical and leadership audiences.
 
