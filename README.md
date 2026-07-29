@@ -1,12 +1,12 @@
 
 ====SLIDE 2=====================================================
 Feature it brings:-
-table_id is generated with combination of target_table and it's load process, it basically help to distinct process if it is loading up to same target table		
-source_tables = all source table info					
-incremental_cutoff_day:- so currently we are following 9 th of the month to do the truncate and load in incremental process, but it flexiable in nature and can be chnages for different table depend on the need.		
-watermark column:- watercolumn is good to have for incremental process, for futture nedd			
-DQ Rule:- A multiple DQ rule can be set [{"dq_rule": "dq_net_rev", "error_threshold_pct": 0.0}] so that whenever data I sloaded from source it can validateed for each
-DQ-sttus:-  for tuning it on//off as per the need
+1.table_id is generated with combination of target_table and it's load process, it basically help to distinct process if it is loading up to same target table		
+2.source_tables = all source table info					
+3.incremental_cutoff_day:- so currently we are following 9 th of the month to do the truncate and load in incremental process, but it flexiable in nature and can be chnages for different table depend on the need.		
+4.watermark column:- watercolumn is good to have for incremental process, for futture nedd			
+5.DQ Rule:- A multiple DQ rule can be set [{"dq_rule": "dq_net_rev", "error_threshold_pct": 0.0}] so that whenever data I sloaded from source it can validateed for each
+6.DQ-sttus:-  for tuning it on//off as per the need
 
 
 ====SLIDE 3=====================================================
