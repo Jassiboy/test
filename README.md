@@ -1,18 +1,60 @@
-Phase 4: RAG (Retrieval-Augmented Generation) (~30-40 hrs)
-Depends on Phase 3
+Phase 1 — LLM & LangChain Foundations
+Goal
 
-Objectives: Build a production-shaped RAG pipeline, not just a toy demo.
+Understand the basic building blocks before touching RAG.
 
-Topics:
+Topics
 
-Ingestion pipelines, chunk size/overlap tuning, retrieval (top-k, MMR), re-ranking (cross-encoders)
-Prompt assembly with retrieved context, citation/source tracking, hallucination mitigation
-RAG evaluation (faithfulness, answer relevance, context precision/recall)
-Resources:
+LLM fundamentals
 
-LangChain or LlamaIndex official docs + tutorials (pick one as primary)
-DeepLearning.AI "LangChain for LLM Application Development" and "Building and Evaluating Advanced RAG"
-Ragas library docs for evaluation
-Hands-on / Project A: RAG chatbot over your Databricks Cookbook, DDIA, and SQL notes PDFs — must answer questions with cited page/source, handle "I don't know" gracefully, and include a basic eval script (Ragas or manual golden Q&A set).
+What is an LLM?
+Tokens
+Context window
+Temperature
+System/user/assistant messages
+Prompt engineering basics
+Structured output
+LLM limitations
 
-Deliverable: RAG chatbot repo with README, architecture diagram, and eval results table.
+LangChain fundamentals
+
+What is LangChain?
+Models
+Prompts
+Messages
+Output parsers
+Chains
+Runnables
+LCEL
+Basic tool calling
+Hands-on
+
+Build:
+
+User Question
+      ↓
+Prompt Template
+      ↓
+LLM
+      ↓
+Structured Response
+Mini Project
+
+Build a small technical Q&A assistant that accepts a question and produces a structured answer.
+
+Interview focus
+
+10–15 questions covering:
+
+LLM vs traditional ML
+Tokens
+Context window
+Temperature
+LangChain abstractions
+Chain vs Runnable
+Why use LangChain?
+Deliverable
+01-langchain-basics/
+├── README.md
+├── notebooks/
+└── src/
