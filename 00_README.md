@@ -18,4 +18,4 @@ I explored it with a simple example.
 **The answer is more interesting than it looks.**
 
 Read the full article:
-https://substack.com/profile/548933604-shubham-jaiswal/note/c-337658241?utm_source=substack&utm_content=first-note-modal
+https://shubhamjaiswal696486.substack.com/p/three-sentences-almost-the-same-words?r=92tjvo&utm_campaign=post-expanded-share&utm_medium=web
