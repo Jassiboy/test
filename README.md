@@ -1,60 +1,14 @@
-Phase 1 — LLM & LangChain Foundations
-Goal
+Day 1: From AI Basics to Advanced
 
-Understand the basic building blocks before touching RAG.
+Kicking off my journey into AI — starting from the fundamentals and working up to the advanced stuff.
 
-Topics
+Today: Messages, Roles, Tokens, and Context Windows — the building blocks of how LLMs actually work.
 
-LLM fundamentals
+Here's a question that trips a lot of people up:
 
-What is an LLM?
-Tokens
-Context window
-Temperature
-System/user/assistant messages
-Prompt engineering basics
-Structured output
-LLM limitations
+Does counting tokens actually consume the model's context window?
 
-LangChain fundamentals
+Simple question, subtle answer — it comes down to the difference between counting tokens and actually using them in a model request.
 
-What is LangChain?
-Models
-Prompts
-Messages
-Output parsers
-Chains
-Runnables
-LCEL
-Basic tool calling
-Hands-on
-
-Build:
-
-User Question
-      ↓
-Prompt Template
-      ↓
-LLM
-      ↓
-Structured Response
-Mini Project
-
-Build a small technical Q&A assistant that accepts a question and produces a structured answer.
-
-Interview focus
-
-10–15 questions covering:
-
-LLM vs traditional ML
-Tokens
-Context window
-Temperature
-LangChain abstractions
-Chain vs Runnable
-Why use LangChain?
-Deliverable
-01-langchain-basics/
-├── README.md
-├── notebooks/
-└── src/
+I break it down with simple examples in today's Substack post. Read it below, and see if you can answer the question first.
+https://shubhamjaiswal696486.substack.com/p/day-1-learning-ai-from-basics-to?r=92tjvo&utm_campaign=post-expanded-share&utm_medium=web
