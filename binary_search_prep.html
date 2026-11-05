@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Binary Search Console — Data Engineer Prep</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #10141B;
+    --bg-panel: #171D26;
+    --bg-panel-raised: #1D2530;
+    --line: #2A3341;
+    --line-soft: #212933;
+    --text: #E8ECF1;
+    --text-muted: #8B96A5;
+    --text-dim: #5C6675;
+    --amber: #F2B84B;
+    --amber-dim: #7A6534;
+    --teal: #5FD4C7;
+    --teal-dim: #2B5A54;
+    --rose: #E8836F;
+    --violet: #B79CF2;
+    --violet-dim: #4A3E6B;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Inter', sans-serif;
+    --display: 'Space Grotesk', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -5%, rgba(95,212,199,0.07), transparent),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(242,184,75,0.06), transparent),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  [contenteditable="true"]:hover{outline:1px dashed var(--teal-dim); outline-offset:2px; border-radius:4px;}
+  [contenteditable="true"]:focus{outline:1px solid var(--teal); outline-offset:2px; border-radius:4px;}
+
+  .topbar{
+    border-bottom:1px solid var(--line);
+    padding:14px 28px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    position:sticky;
+    top:0;
+    background:rgba(16,20,27,0.92);
+    backdrop-filter:blur(10px);
+    z-index:50;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .topbar-left{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13px;color:var(--text-dim);}
+  .dot-row{display:flex;gap:6px;}
+  .dot{width:9px;height:9px;border-radius:50%;}
+  .dot.r{background:#E8836F;} .dot.y{background:#F2B84B;} .dot.g{background:#5FD4C7;}
+  .topbar-actions{display:flex;gap:8px;}
+  .btn{
+    font-family:var(--mono);
+    font-size:12px;
+    padding:7px 13px;
+    border-radius:6px;
+    border:1px solid var(--line);
+    background:var(--bg-panel);
+    color:var(--text-muted);
+    cursor:pointer;
+    transition:border-color .15s, color .15s, background .15s;
+  }
+  .btn:hover{border-color:var(--teal-dim);color:var(--text);}
+  .btn.on{background:var(--teal);color:var(--bg);border-color:var(--teal);font-weight:600;}
+
+  .hero{max-width:960px;margin:0 auto;padding:56px 28px 36px;}
+  .eyebrow{
+    font-family:var(--mono);font-size:12.5px;letter-spacing:0.12em;color:var(--teal);
+    text-transform:uppercase;display:flex;align-items:center;gap:10px;margin-bottom:18px;
+  }
+  .eyebrow::before{content:'❯';color:var(--amber);font-weight:700;}
+  h1{font-family:var(--display);font-size:40px;line-height:1.12;margin:0 0 16px;font-weight:700;letter-spacing:-0.01em;}
+  h1 .hl{color:var(--amber);}
+  h1 .hl2{color:var(--violet);}
+  .lede{color:var(--text-muted);font-size:16px;max-width:680px;margin:0 0 26px;}
+  .lede b{color:var(--text);font-weight:600;}
+  .meta-row{display:flex;flex-wrap:wrap;gap:10px;font-family:var(--mono);font-size:12px;}
+  .chip{border:1px solid var(--line);background:var(--bg-panel);color:var(--text-muted);padding:6px 12px;border-radius:20px;}
+  .chip b{color:var(--text);}
+
+  .section-wrap{max-width:960px;margin:0 auto;padding:0 28px 40px;}
+  .section-title{
+    font-family:var(--mono);font-size:12px;color:var(--text-dim);text-transform:uppercase;
+    letter-spacing:0.1em;margin-bottom:14px;display:flex;align-items:center;gap:8px;
+  }
+  .section-title::after{content:'';flex:1;height:1px;background:var(--line-soft);}
+
+  .tips-card{
+    border:1px solid var(--line);border-radius:10px;background:var(--bg-panel);padding:20px 24px;
+  }
+  .tips-card ul{margin:0;padding-left:20px;}
+  .tips-card li{margin-bottom:8px;color:var(--text-muted);font-size:14.5px;}
+  .tips-card li::marker{color:var(--amber);}
+  .tips-card li b{color:var(--text);}
+
+  .quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:720px){.quick-grid{grid-template-columns:1fr;}}
+  .quick-card{
+    border:1px solid var(--line-soft);border-radius:10px;background:var(--bg-panel);padding:16px 18px;
+  }
+  .quick-card .qtitle{font-family:var(--display);font-size:16px;font-weight:600;margin:0 0 6px;}
+  .quick-card a{color:var(--teal);font-family:var(--mono);font-size:11.5px;text-decoration:none;word-break:break-all;}
+  .quick-card a:hover{text-decoration:underline;}
+  .quick-card .hint{
+    margin-top:10px;padding:9px 12px;background:var(--bg-panel-raised);border-left:2px solid var(--amber);
+    border-radius:0 6px 6px 0;font-size:13px;color:var(--text-muted);
+  }
+  .quick-card .hint b{color:var(--amber);}
+
+  .index-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(230px, 1fr));gap:8px;}
+  .index-item{
+    border:1px solid var(--line-soft);border-radius:8px;padding:10px 14px;text-decoration:none;
+    color:var(--text-muted);font-size:13.5px;display:flex;gap:10px;align-items:baseline;
+    transition:border-color .15s, color .15s, background .15s;
+  }
+  .index-item:hover{border-color:var(--teal-dim);color:var(--text);background:var(--bg-panel);}
+  .index-item .n{font-family:var(--mono);color:var(--amber);font-size:12px;}
+  .index-item.bonus .n{color:var(--violet);}
+
+  .stack{max-width:960px;margin:0 auto;padding:0 28px 100px;display:flex;flex-direction:column;gap:22px;}
+  .card{border:1px solid var(--line);border-radius:10px;background:var(--bg-panel);overflow:hidden;scroll-margin-top:80px;}
+  .card.bonus{border-color:var(--violet-dim);}
+  .card-head{padding:20px 24px 16px;border-bottom:1px solid var(--line-soft);}
+  .card-head-top{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;}
+  .qnum{font-family:var(--mono);font-size:12px;color:var(--bg);background:var(--amber);padding:2px 8px;border-radius:4px;font-weight:700;}
+  .qnum.bonus{background:var(--violet);}
+  .difficulty{
+    font-family:var(--mono);font-size:11px;letter-spacing:0.06em;padding:2px 9px;border-radius:20px;
+    border:1px solid;text-transform:uppercase;
+  }
+  .difficulty.easy{color:var(--teal);border-color:var(--teal-dim);}
+  .difficulty.med{color:var(--amber);border-color:var(--amber-dim);}
+  .difficulty.hard{color:var(--rose);border-color:#5E3A32;}
+  .bonus-tag{
+    font-family:var(--mono);font-size:11px;letter-spacing:0.06em;padding:2px 9px;border-radius:20px;
+    border:1px solid var(--violet-dim);color:var(--violet);text-transform:uppercase;
+  }
+  .card-link{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--teal);text-decoration:none;}
+  .card-link:hover{text-decoration:underline;}
+  .card-title{font-family:var(--display);font-size:21px;font-weight:600;margin:0 0 8px;}
+  .card-prompt{color:var(--text-muted);font-size:14.5px;margin:0;}
+  .card-prompt code{font-family:var(--mono);background:var(--bg-panel-raised);padding:1px 6px;border-radius:4px;font-size:13px;color:var(--teal);}
+
+  .card-body{padding:20px 24px 24px;}
+  .section-label{
+    font-family:var(--mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;
+    color:var(--text-dim);margin:18px 0 8px;display:flex;align-items:center;gap:8px;
+  }
+  .section-label:first-child{margin-top:0;}
+  .section-label::after{content:'';flex:1;height:1px;background:var(--line-soft);}
+
+  pre{
+    margin:0;background:#0C0F14;border:1px solid var(--line-soft);border-radius:8px;padding:14px 16px;
+    overflow-x:auto;font-family:var(--mono);font-size:12.6px;line-height:1.55;white-space:pre-wrap;
+  }
+  code{font-family:var(--mono);}
+  .kw{color:#C58AF2;} .str{color:#A8D97A;} .com{color:var(--text-dim);font-style:italic;} .fn{color:var(--teal);} .num{color:#E8836F;}
+
+  .io-pair{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media (max-width:720px){.io-pair{grid-template-columns:1fr;}}
+  .io-block{background:#0C0F14;border:1px solid var(--line-soft);border-radius:8px;padding:12px 14px;}
+  .io-block h4{font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:0 0 6px;text-transform:uppercase;letter-spacing:.06em;}
+  .io-block .val{font-family:var(--mono);font-size:13px;color:var(--text);}
+
+  details.solution{
+    margin-top:20px;border:1px dashed var(--line);border-radius:8px;
+    background:linear-gradient(180deg, rgba(95,212,199,0.03), transparent);
+  }
+  details.solution summary{
+    list-style:none;cursor:pointer;padding:13px 18px;display:flex;align-items:center;gap:10px;
+    font-family:var(--mono);font-size:13px;color:var(--teal);user-select:none;
+  }
+  details.solution summary::-webkit-details-marker{display:none;}
+  details.solution summary::before{content:'▶';font-size:10px;color:var(--text-dim);transition:transform .18s ease;}
+  details.solution[open] summary::before{transform:rotate(90deg);}
+  details.solution summary .prompt-txt{color:var(--text-dim);}
+  details.solution summary .exec{color:var(--amber);}
+  details.solution[open] summary{border-bottom:1px solid var(--line-soft);}
+  .solution-inner{padding:16px 18px 20px;}
+  .approach{
+    color:var(--text-muted);font-size:13.5px;margin:0 0 14px;padding:10px 14px;
+    background:var(--bg-panel-raised);border-left:2px solid var(--teal);border-radius:0 6px 6px 0;
+  }
+  .de-angle{
+    margin-top:14px;padding:10px 14px;background:var(--bg-panel-raised);border-left:2px solid var(--violet);
+    border-radius:0 6px 6px 0;font-size:13.5px;color:var(--text-muted);
+  }
+  .de-angle b{color:var(--violet);}
+
+  footer{
+    max-width:960px;margin:0 auto;padding:0 28px 60px;font-family:var(--mono);font-size:12px;
+    color:var(--text-dim);border-top:1px solid var(--line-soft);padding-top:24px;
+  }
+  footer .blink{color:var(--teal);}
+
+  a.chip.jump{text-decoration:none;}
+  a.chip.jump:hover{border-color:var(--teal-dim);color:var(--text);}
+  .topic-banner{max-width:960px;margin:20px auto 28px;padding:22px 28px;border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:10px;background:var(--bg-panel);scroll-margin-top:80px;}
+  .topic-banner .topic-num{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--amber);}
+  .topic-banner h2{font-family:var(--display);font-size:28px;margin:4px 0 6px;}
+  .topic-banner p{margin:0;color:var(--text-muted);font-size:14.5px;}
+  .topic-banner code{font-family:var(--mono);background:var(--bg-panel-raised);padding:1px 6px;border-radius:4px;color:var(--teal);font-size:13px;}
+  .tips-card code,.quick-card code{font-family:var(--mono);background:var(--bg-panel-raised);padding:1px 6px;border-radius:4px;color:var(--teal);font-size:12.5px;}
+  @media (max-width:1000px){.topic-banner{margin-left:28px;margin-right:28px;}}
+
+  .note-banner{border:1px solid var(--amber-dim);border-left:3px solid var(--amber);background:var(--bg-panel);border-radius:10px;padding:14px 18px;font-size:14px;color:var(--text-muted);}
+  .note-banner b{color:var(--amber);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="dot-row"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div>
+    binary_search_prep.py
+  </div>
+  <div class="topbar-actions">
+    <button class="btn" id="editToggle">✏️ Edit mode: off</button>
+    <button class="btn" id="downloadBtn">⬇ Save edited copy</button>
+  </div>
+</div>
+
+<div class="hero">
+  <div class="eyebrow">practice set · binary search</div>
+  <h1>Binary Search for your <span class="hl">FAANG</span> / <span class="hl2">Senior Data Engineer</span> loop</h1>
+  <p class="lede" contenteditable="true">
+    Built around <b>your own notebook solutions</b> (ceiling, mountain peak, rotated-array search), copied as-is and runnable.
+    Two problems needed a matching solution, so I wrote those in the same template style and tagged them clearly.
+    Two <b>bonus</b> "binary search on the answer" problems and a <b>scenario-based Q&amp;A</b> section round it out.
+    Click <b>"Edit mode"</b> to edit anything, then <b>"Save edited copy"</b> to download your version.
+  </p>
+  <div class="meta-row">
+    <div class="chip"><b>7</b> problems</div>
+    <div class="chip"><b>3</b> your solutions</div>
+    <div class="chip"><b>2</b> added solutions</div>
+    <div class="chip"><b>2</b> bonus</div>
+    <div class="chip"><b>8</b> scenario Q&amp;As</div>
+    <div class="chip">Editable in-browser</div>
+  </div>
+</div>
+
+<div class="section-wrap">
+  <div class="note-banner" contenteditable="true">
+    <b>Heads-up on the notebook:</b> the section titled <i>"First Occurrence"</i> contained the mountain-peak code, and the section titled
+    <i>"Minimum in rotated sorted array"</i> contained the rotated-array <i>search</i> code (the same snippets appear again under their own titles).
+    I used each of your snippets once under the title it actually solves. For <b>First Occurrence</b> and <b>Minimum in Rotated Sorted Array</b> I wrote
+    new solutions in your template style, tagged <span style="color:var(--violet)">Added solution</span>. Swap in your own if you have them.
+  </div>
+</div>
+
+<div class="section-wrap">
+  <div class="section-title">General tips</div>
+  <div class="tips-card">
+    <ul contenteditable="true">
+      <li><b>Precondition:</b> binary search works whenever there is a <b>monotonic yes/no condition</b> (false...false, true...true), not only on "sorted arrays". Always ask: what is my condition, and is it monotonic?</li>
+      <li><b>Template A (exact match):</b> <code>while low &lt;= high</code>, <code>mid</code>, return on match, otherwise <code>low = mid + 1</code> or <code>high = mid - 1</code>. Used in rotated-array search.</li>
+      <li><b>Template B (converge to a boundary):</b> <code>while low &lt; high</code>, and <code>high = mid</code> (keep the candidate) or <code>low = mid + 1</code>. When the loop ends, <code>low == high</code> is the answer. Used for ceiling, mountain peak, and minimum in a rotated array.</li>
+      <li><b>Avoid infinite loops:</b> with left-mid (<code>(low + high) // 2</code>) never write <code>low = mid</code>; always <code>low = mid + 1</code>. If you really need <code>low = mid</code>, use right-mid <code>(low + high + 1) // 2</code>.</li>
+      <li><b>Find first / last occurrence:</b> on a match, record the index and keep searching left (first) or right (last) instead of returning.</li>
+      <li><b>Ceiling = smallest element &gt;= x</b> (lower bound); <b>floor = largest element &lt;= x</b>. Handle the edge cases first: empty array, x above the max, x at or below the first element.</li>
+      <li><b>Rotated array:</b> at least one half around <code>mid</code> is always sorted. Decide which one, then check whether the target lies inside that sorted range. Duplicates can degrade this to O(n).</li>
+      <li><b>Binary search on the answer:</b> when the question is "what is the minimum X such that a condition holds", search over the range of possible X and write a <code>feasible(X)</code> check. Complexity is O(n log range).</li>
+      <li>In Python, <code>bisect_left</code> / <code>bisect_right</code> give lower/upper bound for free, but interviewers still expect you to write the loop by hand.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="section-wrap">
+  <div class="section-title">Quick revision problems</div>
+  <div class="quick-grid">
+    <div class="quick-card">
+      <h3 class="qtitle" contenteditable="true">Ceiling Value / Search Insert Position (easy)</h3>
+      <a href="https://leetcode.com/problems/search-insert-position/" target="_blank" rel="noopener">leetcode.com/problems/search-insert-position</a>
+      <div class="hint" contenteditable="true"><b>Hint:</b> Template B. If <code>nums[mid] &gt;= x</code> then <code>high = mid</code> (mid may be the ceiling), else <code>low = mid + 1</code>. Handle empty, x &gt; max, x &lt;= first before the loop.</div>
+    </div>
+    <div class="quick-card">
+      <h3 class="qtitle" contenteditable="true">Peak Index in a Mountain Array (medium)</h3>
+      <a href="https://leetcode.com/problems/peak-index-in-a-mountain-array/" target="_blank" rel="noopener">leetcode.com/problems/peak-index-in-a-mountain-array</a>
+      <div class="hint" contenteditable="true"><b>Hint:</b> Compare <code>arr[mid]</code> with <code>arr[mid + 1]</code>. Still climbing: <code>low = mid + 1</code>. Otherwise <code>high = mid</code>.</div>
+    </div>
+    <div class="quick-card">
+      <h3 class="qtitle" contenteditable="true">Search in Rotated Sorted Array (medium)</h3>
+      <a href="https://leetcode.com/problems/search-in-rotated-sorted-array/" target="_blank" rel="noopener">leetcode.com/problems/search-in-rotated-sorted-array</a>
+      <div class="hint" contenteditable="true"><b>Hint:</b> Template A. Find the sorted half with <code>nums[low] &lt;= nums[mid]</code>, then test whether the target lies in that half's range.</div>
+    </div>
+  </div>
+</div>
+
+<div class="section-wrap">
+  <div class="section-title">Jump to a problem</div>
+  <div class="index-grid" id="indexGrid"></div>
+</div>
+<div class="stack" id="stack"></div>
+
+<div class="section-wrap" style="padding-top:10px;">
+  <div class="section-title">Scenario-based Q&amp;A (in-depth concepts)</div>
+  <div id="qaList" style="display:flex;flex-direction:column;gap:12px;"></div>
+</div>
+
+<footer>
+  <span class="blink">$</span> tip — for a senior data engineer loop, the code is the easy part. Be ready to say why the condition is monotonic, which template you chose and why, and how the same idea shows up in real systems: partition pruning, Parquet min/max statistics, sparse indexes and LSM-tree lookups.
+</footer>
+
+<script>
+const problems = [
+{
+  id: "b-ceiling", difficulty: "easy", bonus: false, tag: "mine",
+  title: "Ceiling Value in a Sorted Array",
+  link: "https://leetcode.com/problems/search-insert-position/",
+  linkNote: "closest LeetCode equivalent",
+  prompt: `Given a <code>sorted</code> array and a value <code>x</code>, find the <code>ceiling</code> of x: the smallest element in the array that is greater than or equal to x. Report if no ceiling exists.`,
+  input: `nums = [1, 1, 2, 8, 10, 11, 12, 19],  x = 9`,
+  output: `Ceiling of 9 is 10`,
+  approach: `Handle three edge cases first (empty array, x larger than the max, x at or below the first element). Then Template B: if <code>nums[mid] >= x</code>, mid could be the ceiling, so <code>high = mid</code>; otherwise the ceiling is strictly to the right, so <code>low = mid + 1</code>. When the loop ends, <code>low == high</code> points at the ceiling. O(log n) time, O(1) space. Change <code>x</code> to 9 to see the main path (x = 0 triggers the first-element edge case).`,
+  solution: `nums = [1, 1, 2, 8, 10, 11, 12, 19]
+x = 0
+
+# Edge case: empty array
+if not nums:
+    print("Array is empty, no ceiling exists")
+# Edge case: x is greater than the largest element
+elif x > nums[-1]:
+    print(f"No ceiling exists for {x} (exceeds max element {nums[-1]})")
+# Edge case: x is smaller than or equal to the first element
+elif x <= nums[0]:
+    print(f"Ceiling of {x} is {nums[0]} (first element itself)")
+else:
+    # Binary search for the smallest element >= x
+    low = 0
+    high = len(nums) - 1
+
+    while low < high:
+        mid = (low + high) // 2  # Find the middle index
+
+        if nums[mid] >= x:
+            high = mid   # Ceiling could be at mid or to the left
+        else:
+            low = mid + 1  # Ceiling must be to the right
+
+    # At the end, low == high == index of the ceiling element
+    print(f"Ceiling of {x} is {nums[high]}")`,
+  deAngle: `Follow-up: "find the first event at or after timestamp T in a sorted log." That is exactly this lower-bound search. It is also how partition pruning and Parquet row-group min/max statistics skip data: binary search over sorted metadata instead of scanning rows.`
+},
+{
+  id: "b-first-occurrence", difficulty: "easy", bonus: false, tag: "added",
+  title: "First Occurrence in a Sorted Array",
+  link: "https://leetcode.com/problems/find-first-and-last-position-of-element-in-sorted-array/",
+  prompt: `Given a <code>sorted</code> array that may contain duplicates, return the index of the <code>first occurrence</code> of the target, or -1 if it is absent.`,
+  input: `nums = [5, 7, 7, 8, 8, 10],  target = 8`,
+  output: `First occurrence of 8 is at index 3`,
+  approach: `Same loop as an exact-match search (Template A), but on a match do not stop: record the index as a candidate and keep searching the left half with <code>high = mid - 1</code>, because an earlier copy may exist. The last recorded candidate is the first occurrence. For the last occurrence, move right on a match (<code>low = mid + 1</code>) instead. O(log n).`,
+  solution: `nums = [5, 7, 7, 8, 8, 10]
+target = 8
+
+# Edge case: empty array
+if not nums:
+    print("Array is empty")
+else:
+    low = 0
+    high = len(nums) - 1
+    result = -1
+
+    # Template A variant: on a match, remember it and keep searching LEFT
+    while low <= high:
+        mid = (low + high) // 2
+
+        if nums[mid] == target:
+            result = mid        # candidate; an earlier occurrence may exist
+            high = mid - 1
+        elif nums[mid] < target:
+            low = mid + 1
+        else:
+            high = mid - 1
+
+    if result != -1:
+        print(f"First occurrence of {target} is at index {result}")
+    else:
+        print(f"{target} not found in the array")`,
+  deAngle: `Follow-up: "how many times does a key occur in a sorted dataset?" Answer: last occurrence index minus first occurrence index plus 1, i.e. two O(log n) searches instead of a scan. Python's bisect_right(a, x) - bisect_left(a, x) does the same in one line.`
+},
+{
+  id: "b-mountain-peak", difficulty: "med", bonus: false, tag: "mine",
+  title: "Peak Index in a Mountain Array",
+  link: "https://leetcode.com/problems/peak-index-in-a-mountain-array/",
+  prompt: `An array strictly increases to a peak and then strictly decreases. Return the <code>index of the peak</code> (the array has at least 3 elements).`,
+  input: `arr = [0, 2, 1, 0]`,
+  output: `Peak is at index 1, value = 2`,
+  approach: `Compare <code>arr[mid]</code> with its right neighbour. If it is smaller, we are still climbing, so the peak is to the right (<code>low = mid + 1</code>). Otherwise we are at the peak or descending, so mid could be the peak (<code>high = mid</code>). The condition "still climbing?" is monotonic (true...true, false...false), which is why binary search applies even though the array is not sorted. O(log n).`,
+  solution: `arr = [0, 2, 1, 0]
+
+# Edge case: array too small to form a mountain
+if len(arr) < 3:
+    print("Not a valid mountain array (need at least 3 elements)")
+else:
+    # Peak is guaranteed to not be at the first or last index
+    low = 0
+    high = len(arr) - 1
+
+    # Template B: converge to the peak index
+    # Condition: arr[mid] > arr[mid+1] means we're on the descent or at the peak
+    #           arr[mid] < arr[mid+1] means we're still climbing — peak is to the right
+    while low < high:
+        mid = (low + high) // 2       # left-mid (safe here since we use high = mid)
+
+        if arr[mid] < arr[mid + 1]:   # still ascending — peak must be to the right
+            low = mid + 1             # mid is NOT the peak, move past it
+        else:                         # descending or at peak — peak could be at mid
+            high = mid                # keep mid, search left
+
+    # Post-loop: low == high == peak index
+    print(f"Peak is at index {low}, value = {arr[low]}")`,
+  deAngle: `Follow-up: "does this work on an unsorted array?" Yes for finding <i>a</i> local peak (LeetCode 162): at any mid, moving toward the larger neighbour guarantees a peak on that side. This shows you reason from the invariant, not the problem statement.`
+},
+{
+  id: "b-min-rotated", difficulty: "med", bonus: false, tag: "added",
+  title: "Minimum in Rotated Sorted Array",
+  link: "https://leetcode.com/problems/find-minimum-in-rotated-sorted-array/",
+  prompt: `A sorted array of <b>distinct</b> values was rotated at an unknown pivot. Return the <code>minimum element</code> in O(log n).`,
+  input: `nums = [4, 5, 6, 7, 0, 1, 2]`,
+  output: `Minimum is 0 at index 4`,
+  approach: `Template B against the right boundary. If <code>nums[mid] > nums[high]</code>, the rotation point (the minimum) is strictly to the right of mid, so <code>low = mid + 1</code>. Otherwise the right half is sorted and mid could itself be the minimum, so <code>high = mid</code>. When low meets high, that index is the minimum. Compare against <code>nums[high]</code>, not <code>nums[low]</code>, because it also works when the array is not rotated at all. With duplicates you need an extra branch (<code>high -= 1</code> on equality) and the worst case becomes O(n).`,
+  solution: `nums = [4, 5, 6, 7, 0, 1, 2]
+
+# Edge case: empty array
+if not nums:
+    print("Array is empty")
+else:
+    low = 0
+    high = len(nums) - 1
+
+    # Template B: converge to the rotation point (the minimum)
+    while low < high:
+        mid = (low + high) // 2
+
+        if nums[mid] > nums[high]:   # minimum lies strictly to the right of mid
+            low = mid + 1
+        else:                        # right half is sorted; mid could be the minimum
+            high = mid
+
+    print(f"Minimum is {nums[low]} at index {low}")`,
+  deAngle: `Follow-up: "a ring buffer or a circular log file was written starting at an unknown offset; how do you find where the oldest record is?" Same problem: locate the rotation point with this search, then read from there.`
+},
+{
+  id: "b-search-rotated", difficulty: "med", bonus: false, tag: "mine",
+  title: "Search in Rotated Sorted Array",
+  link: "https://leetcode.com/problems/search-in-rotated-sorted-array/",
+  prompt: `A sorted array of distinct values was rotated at an unknown pivot. Given a <code>target</code>, return its index or -1 if absent, in O(log n).`,
+  input: `nums = [4, 5, 6, 7, 0, 1, 2],  target = 0`,
+  output: `Found 0 at index 4`,
+  approach: `Template A. At every step, at least one half around mid is sorted. If <code>nums[low] <= nums[mid]</code> the left half is sorted: if the target lies inside that range, go left, otherwise go right. If not, the right half is sorted: apply the same test on it. Each iteration discards half of the array, so O(log n).`,
+  solution: `nums = [4, 5, 6, 7, 0, 1, 2]
+target = 0
+
+# Edge case: empty array
+if not nums:
+    print("Array is empty")
+else:
+    low = 0
+    high = len(nums) - 1
+    result = -1
+
+    # Template A: low <= high, return mid on exact match
+    # Key idea: one half is ALWAYS sorted — figure out which,
+    #           then check if target lies in that sorted range
+    while low <= high:
+        mid = (low + high) // 2
+
+        if nums[mid] == target:                    # found it!
+            result = mid
+            break
+
+        # Determine which half is sorted
+        if nums[low] <= nums[mid]:                 # LEFT half [low..mid] is sorted
+            if nums[low] <= target < nums[mid]:    # target is in the sorted left half
+                high = mid - 1
+            else:                                  # target must be in the right half
+                low = mid + 1
+        else:                                      # RIGHT half [mid..high] is sorted
+            if nums[mid] < target <= nums[high]:   # target is in the sorted right half
+                low = mid + 1
+            else:                                  # target must be in the left half
+                high = mid - 1
+
+    if result != -1:
+        print(f"Found {target} at index {result}")
+    else:
+        print(f"{target} not found in the array")`,
+  deAngle: `Follow-up: "what if duplicates are allowed?" When nums[low] == nums[mid] == nums[high] you cannot tell which half is sorted, so shrink both ends by one; the worst case degrades to O(n). Saying this unprompted is a strong signal.`
+},
+{
+  id: "b-koko", difficulty: "med", bonus: true, tag: "bonus",
+  title: "Koko Eating Bananas (binary search on the answer)",
+  link: "https://leetcode.com/problems/koko-eating-bananas/",
+  prompt: `Koko must eat all piles of bananas within <code>h</code> hours. Each hour she picks one pile and eats up to <code>k</code> bananas from it. Return the <code>minimum k</code> that finishes in time.`,
+  input: `piles = [3, 6, 7, 11],  h = 8`,
+  output: `Minimum eating speed is 4`,
+  approach: `Search over the answer range [1, max(piles)]. <code>feasible(k)</code> = total hours at speed k (sum of ceil(pile / k)) is at most h. Feasibility is monotonic: if speed k works, any faster speed works too. Template B: if feasible, <code>high = mid</code>; otherwise <code>low = mid + 1</code>. O(n log max(piles)).`,
+  solution: `piles = [3, 6, 7, 11]
+h = 8
+
+low, high = 1, max(piles)
+
+while low < high:
+    mid = (low + high) // 2
+    hours = sum((p + mid - 1) // mid for p in piles)   # integer ceil(p / mid)
+
+    if hours <= h:     # speed 'mid' is fast enough; try slower
+        high = mid
+    else:              # too slow; need a higher speed
+        low = mid + 1
+
+print(f"Minimum eating speed is {low}")`,
+  deAngle: `Bonus, very DE-relevant: "what is the minimum number of workers / executors so a batch finishes inside the SLA window?" Same structure: monotonic feasibility check plus search over the resource range.`
+},
+{
+  id: "b-ship", difficulty: "med", bonus: true, tag: "bonus",
+  title: "Capacity to Ship Packages Within D Days",
+  link: "https://leetcode.com/problems/capacity-to-ship-packages-within-d-days/",
+  prompt: `Packages must be shipped in the given order. Each day the ship carries a load up to its capacity. Return the <code>least capacity</code> that ships everything within <code>days</code> days.`,
+  input: `weights = [1,2,3,4,5,6,7,8,9,10],  days = 5`,
+  output: `Least capacity is 15`,
+  approach: `The answer lies between max(weights) (must fit the heaviest package) and sum(weights) (ship everything in one day). <code>feasible(cap)</code> simulates loading in order and counts days. If it fits in the allowed days, try a smaller capacity (<code>high = mid</code>); otherwise <code>low = mid + 1</code>.`,
+  solution: `weights = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+days = 5
+
+low, high = max(weights), sum(weights)
+
+while low < high:
+    mid = (low + high) // 2
+
+    # Simulate shipping with capacity = mid
+    days_needed, load = 1, 0
+    for w in weights:
+        if load + w > mid:
+            days_needed += 1
+            load = 0
+        load += w
+
+    if days_needed <= days:
+        high = mid       # capacity mid works; try smaller
+    else:
+        low = mid + 1    # capacity too small
+
+print(f"Least capacity is {low}")`,
+  deAngle: `Bonus: this is the "split an array into at most D contiguous partitions minimising the largest sum" problem, which maps to balancing sequential batches across workers while keeping the largest batch as small as possible.`
+}
+];
+
+const qa = [
+{
+  q: `Why is <code>mid = (low + high) // 2</code> fine in Python, and when would you write it differently?`,
+  a: `Python integers do not overflow, so the sum of two indices is always safe. In Java, C++ or Go, <code>low + high</code> can overflow a 32-bit int on very large arrays, so you write <code>low + (high - low) // 2</code>. Mentioning this shows language-level awareness. Separately, <code>(low + high) // 2</code> is a <b>left-mid</b> (it rounds down). It pairs with <code>high = mid</code> and <code>low = mid + 1</code>. If you ever need <code>low = mid</code>, switch to right-mid <code>(low + high + 1) // 2</code> or the loop will never terminate.`
+},
+{
+  q: `Scenario: you wrote <code>while low &lt; high</code> with <code>low = mid</code> and the loop hangs on a 2-element array. Why?`,
+  a: `With <code>low = 0, high = 1</code>, left-mid is 0. If the branch sets <code>low = mid</code>, low stays 0 forever. The fix is either <code>low = mid + 1</code> (when mid is definitely not the answer) or right-mid when mid itself must stay in range. Rule of thumb: whichever side keeps mid (<code>high = mid</code> or <code>low = mid</code>) decides the mid rounding. <code>high = mid</code> pairs with left-mid; <code>low = mid</code> pairs with right-mid.`,
+  code: `# Runnable: last position with value <= x (floor) needs right-mid
+nums = [1, 3, 5, 7, 9]
+x = 6
+low, high = 0, len(nums) - 1
+while low < high:
+    mid = (low + high + 1) // 2      # right-mid, because we use low = mid
+    if nums[mid] <= x:
+        low = mid                    # mid might be the floor, keep it
+    else:
+        high = mid - 1
+print(nums[low] if nums and nums[0] <= x else None)   # 5`
+},
+{
+  q: `Scenario: a 5 TB event table is sorted by <code>event_ts</code> in Parquet. How is "first event at or after time T" answered without scanning everything?`,
+  a: `Parquet footers store min/max statistics per row group and per page. A reader binary-searches (or linearly prunes) those sorted ranges to find the first row group whose max is at least T, then reads only that group. Delta Lake adds data skipping from file-level stats, and Z-ORDER or sorting by <code>event_ts</code> makes the ranges tight and non-overlapping, so the search prunes most files. Conceptually this is the ceiling / lower-bound search, applied to metadata instead of rows. In code, <code>bisect_left</code> is the in-memory version.`,
+  code: `import bisect
+timestamps = [100, 105, 105, 110, 120, 150]
+T = 108
+i = bisect.bisect_left(timestamps, T)       # first index with ts >= T
+print(i, timestamps[i] if i < len(timestamps) else None)   # 3 110`
+},
+{
+  q: `Scenario: how do you count occurrences of a key in a sorted array in O(log n)?`,
+  a: `Run two boundary searches: the <b>first</b> index where the value is at least the key (lower bound) and the first index where the value is <b>greater than</b> the key (upper bound). The count is the difference. This avoids the O(n) scan that a "find one match then walk both ways" approach degrades to when the key is very frequent (for example, millions of identical status codes in a sorted log).`,
+  code: `import bisect
+nums = [5, 7, 7, 8, 8, 8, 10]
+key = 8
+count = bisect.bisect_right(nums, key) - bisect.bisect_left(nums, key)
+print(count)   # 3`
+},
+{
+  q: `Why can you always find a sorted half in a rotated array, and what changes when duplicates exist?`,
+  a: `A rotation splits a sorted array into two sorted runs, with the pivot between them. Any mid either lies in the first run (so [low..mid] is sorted) or in the second run (so [mid..high] is sorted); the pivot can only be inside one of the two halves, never both. That is why one half is always sorted. With duplicates, <code>nums[low] == nums[mid] == nums[high]</code> gives no information about which side contains the pivot (for example [1, 1, 1, 0, 1] versus [1, 0, 1, 1, 1]). You must shrink both ends by one, so the worst case becomes O(n). Interviewers use this to test whether you understand the invariant rather than a memorised pattern.`
+},
+{
+  q: `Why does binary search work on a mountain array, which is not sorted?`,
+  a: `Binary search needs a <b>monotonic predicate</b>, not sortedness. Define <code>climbing(i) = arr[i] &lt; arr[i+1]</code>. On a mountain array it is true for every index before the peak and false from the peak onward (true...true, false...false). Finding the first false index is a boundary search. The same reasoning extends to "find any local peak" in an arbitrary array: step toward the larger neighbour and a peak must exist on that side.`
+},
+{
+  q: `Scenario: "find the minimum number of executors so the batch finishes within 60 minutes." Walk me through the approach.`,
+  a: `This is <b>binary search on the answer</b>. Define <code>feasible(n)</code> = estimated runtime with n executors is at most 60 minutes. It is monotonic (more executors never make it slower, up to the point where shuffle overhead and skew dominate, which you should call out as a modelling caveat). Search n between 1 and a sensible upper bound, using <code>high = mid</code> when feasible. Cost is O(log range) feasibility checks, each of which may be a simulation or an estimate rather than a real run. The same template solves Koko Eating Bananas, Capacity to Ship Packages, and "split array largest sum".`
+},
+{
+  q: `Scenario: the dataset is too large for memory. How does binary search still apply?`,
+  a: `You search the <b>index</b>, not the data. Real systems store a sparse index (one entry per block or SSTable page) in memory; binary search it to find the block, then read just that block from disk. B-trees, LSM-tree SSTables, and Parquet row-group statistics all follow this pattern. For a sorted file on disk you can also binary search by byte offset: seek to the midpoint, scan to the next record boundary, compare, and repeat, reading O(log n) blocks instead of the whole file. The invariant is the same; only the cost model changes from comparisons to I/O.`
+}
+];
+
+// ---- tiny Python syntax highlighter ----
+function highlight(code){
+  const esc = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const re = /(#.*$)|("(?:[^"]|\\.)*"|'(?:[^']|\\.)*')|\b(def|class|return|for|in|if|elif|else|while|not|and|or|import|from|continue|break|None|True|False|is|lambda)\b|\b(\d+)\b/gm;
+  return esc.replace(re, (m, com, str, kw, num) => {
+    if (com) return '<span class="com">' + m + '</span>';
+    if (str) return '<span class="str">' + m + '</span>';
+    if (kw)  return '<span class="kw">' + m + '</span>';
+    if (num) return '<span class="num">' + m + '</span>';
+    return m;
+  });
+}
+
+const indexGrid = document.getElementById('indexGrid');
+const stack = document.getElementById('stack');
+
+problems.forEach((p, i) => {
+  const num = 'B' + String(i + 1).padStart(2, '0');
+  const diffLabel = p.difficulty === 'easy' ? 'Easy' : p.difficulty === 'med' ? 'Medium' : 'Hard';
+  const tagHtml = p.tag === 'mine'
+    ? '<span class="bonus-tag" style="color:var(--teal);border-color:var(--teal-dim)">Your solution</span>'
+    : p.tag === 'added'
+    ? '<span class="bonus-tag">Added solution</span>'
+    : '<span class="bonus-tag">Bonus addition</span>';
+
+  const idxEl = document.createElement('a');
+  idxEl.href = '#' + p.id;
+  idxEl.className = 'index-item' + (p.bonus ? ' bonus' : '');
+  idxEl.innerHTML = '<span class="n">' + num + '</span> ' + p.title + (p.bonus ? ' ✦' : '');
+  indexGrid.appendChild(idxEl);
+
+  const card = document.createElement('div');
+  card.className = 'card' + (p.bonus ? ' bonus' : '');
+  card.id = p.id;
+  card.innerHTML = `
+    <div class="card-head">
+      <div class="card-head-top">
+        <span class="qnum ${p.bonus ? 'bonus' : ''}">${num}</span>
+        <span class="difficulty ${p.difficulty}">${diffLabel}</span>
+        ${tagHtml}
+        <a class="card-link" href="${p.link}" target="_blank" rel="noopener">${p.link}${p.linkNote ? ' (' + p.linkNote + ')' : ''}</a>
+      </div>
+      <h3 class="card-title" contenteditable="true">${p.title}</h3>
+      <p class="card-prompt" contenteditable="true">${p.prompt}</p>
+    </div>
+    <div class="card-body">
+      <div class="section-label">Sample Input / Output</div>
+      <div class="io-pair">
+        <div class="io-block"><h4>Input</h4><div class="val" contenteditable="true"></div></div>
+        <div class="io-block"><h4>Output</h4><div class="val" contenteditable="true"></div></div>
+      </div>
+      <details class="solution">
+        <summary><span class="prompt-txt">#</span> <span class="exec">Reveal approach &amp; solution</span> <span class="prompt-txt">(try it yourself first)</span></summary>
+        <div class="solution-inner">
+          <p class="approach" contenteditable="true"><b>Approach:</b> ${p.approach}</p>
+          <pre><code contenteditable="true">${highlight(p.solution)}</code></pre>
+          <div class="de-angle" contenteditable="true"><b>DE interview angle:</b> ${p.deAngle}</div>
+        </div>
+      </details>
+    </div>`;
+  const vals = card.querySelectorAll('.io-block .val');
+  vals[0].textContent = p.input;
+  vals[1].textContent = p.output;
+  stack.appendChild(card);
+});
+
+const qaList = document.getElementById('qaList');
+qa.forEach((item, i) => {
+  const d = document.createElement('details');
+  d.className = 'solution';
+  d.innerHTML = `
+    <summary><span class="prompt-txt">Q${i + 1}</span> <span class="exec" style="color:var(--text)">${item.q}</span></summary>
+    <div class="solution-inner">
+      <p class="approach" contenteditable="true">${item.a}</p>
+      ${item.code ? '<pre><code contenteditable="true">' + highlight(item.code) + '</code></pre>' : ''}
+    </div>`;
+  qaList.appendChild(d);
+});
+
+// --- Edit mode toggle ---
+const editBtn = document.getElementById('editToggle');
+let editing = false;
+editBtn.addEventListener('click', () => {
+  editing = !editing;
+  document.designMode = editing ? 'on' : 'off';
+  editBtn.textContent = editing ? '✅ Edit mode: on' : '✏️ Edit mode: off';
+  editBtn.classList.toggle('on', editing);
+});
+
+// --- Download edited copy ---
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  if (editing) { document.designMode = 'off'; editBtn.textContent = '✏️ Edit mode: off'; editBtn.classList.remove('on'); editing = false; }
+  const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'binary_search_prep_edited.html';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
