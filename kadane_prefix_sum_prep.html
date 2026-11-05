@@ -1,0 +1,2535 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+    <script>
+      (function() {
+        // Capture host references before any artifact code runs: Window.parent
+        // is [Replaceable] (a top-level `var parent` in artifact code would
+        // replace the accessor with a data property), and a top-level
+        // `const crypto` would shadow the global — either would otherwise
+        // silently break the bridge for artifacts that worked before.
+        const realParent = window.parent;
+        const cryptoObj = window.crypto;
+        const RealURL = URL;
+        const realDecodeURIComponent = decodeURIComponent;
+        const RealTextEncoder = TextEncoder;
+        const realAtob = atob;
+        // html-to-image is only used by takeScreenshot: fetched on first use, not as a
+        // parser-blocking tag. Native fetch, captured before the proxy override below.
+        const realFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
+        const HTML_TO_IMAGE_SRC = "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.13/html-to-image.min.js";
+        const HTML_TO_IMAGE_INTEGRITY = "sha512-iZ2ORl595Wx6miw+GuadDet4WQbdSWS3JLMoNfY8cRGoEFy6oT3G9IbcrBeL6AfkgpA51ETt/faX6yLV+/gFJg==";
+        let htmlToImageLoad = null;
+        const loadHtmlToImage = () => {
+          if (!htmlToImageLoad) {
+            htmlToImageLoad = (realFetch
+              ? realFetch(HTML_TO_IMAGE_SRC, { integrity: HTML_TO_IMAGE_INTEGRITY, credentials: 'omit', referrerPolicy: 'no-referrer' })
+              : Promise.reject(new Error('fetch unavailable'))
+            )
+              .then((res) => {
+                if (!res.ok) throw new Error('html-to-image failed to load (' + res.status + ')');
+                return res.text();
+              })
+              .then((source) => {
+                // UMD bundle: hide the artifact's AMD/CommonJS globals so it takes the
+                // window-global branch; inline script text runs synchronously on insert.
+                const hidden = ['define', 'module', 'exports'].map((k) => {
+                  const entry = { k, own: Object.prototype.hasOwnProperty.call(window, k), v: window[k] };
+                  try { window[k] = undefined; } catch (e) {}
+                  return entry;
+                });
+                try {
+                  const el = document.createElement('script');
+                  el.text = source;
+                  (document.head || document.documentElement).appendChild(el);
+                } finally {
+                  hidden.forEach(({ k, own, v }) => {
+                    try { if (own) { window[k] = v; } else { delete window[k]; } } catch (e) {}
+                  });
+                }
+                if (!window.htmlToImage) throw new Error('html-to-image unavailable after load');
+                return window.htmlToImage;
+              });
+            // A failed load may be transient; let the next screenshot retry.
+            htmlToImageLoad.catch(() => { htmlToImageLoad = null; });
+          }
+          return htmlToImageLoad;
+        };
+        // crypto.randomUUID exists only in Secure Contexts; fall back to a
+        // unique non-crypto id elsewhere (http://LAN-IP dev flows) —
+        // uniqueness is what the bridge needs, unpredictability is
+        // defense-in-depth on top of the source guards.
+        const newRequestId =
+          cryptoObj && typeof cryptoObj.randomUUID === "function"
+            ? function () { return cryptoObj.randomUUID(); }
+            : function () { return Date.now() + "-" + Math.random(); };
+        const originalConsole = window.console;
+        window.console = {
+          log: (...args) => {
+            originalConsole.log(...args);
+            realParent.postMessage({ type: 'console', message: args.join(' ') }, '*');
+          },
+          error: (...args) => {
+            originalConsole.error(...args);
+            realParent.postMessage({ type: 'console', message: 'Error: ' + args.join(' ') }, '*');
+          },
+          warn: (...args) => {
+            originalConsole.warn(...args);
+            realParent.postMessage({ type: 'console', message: 'Warning: ' + args.join(' ') }, '*');
+          }
+        };
+
+        // Bridge request ids are crypto-random (not sequential) so they
+        // cannot be predicted by other frames in the tab.
+        let callbacksMap = new Map();
+        let streamControllers = new Map();
+        
+        window.claude = {
+          complete: (prompt) => {
+            return new Promise((resolve, reject) => {
+              const id = newRequestId();
+              callbacksMap.set(id, { resolve, reject });
+              realParent.postMessage({ type: 'claudeComplete', id, prompt }, '*');
+            });
+          }
+        };
+
+        window.storage = {
+          get: (key, shared = false) => {
+            return new Promise((resolve, reject) => {
+              const id = newRequestId();
+              callbacksMap.set(id, { resolve, reject });
+              realParent.postMessage({ type: 'storageGet', id, key, shared }, '*');
+            });
+          },
+          set: (key, value, shared = false) => {
+            return new Promise((resolve, reject) => {
+              const id = newRequestId();
+              callbacksMap.set(id, { resolve, reject });
+              realParent.postMessage({ type: 'storageSet', id, key, value, shared }, '*');
+            });
+          },
+          delete: (key, shared = false) => {
+            return new Promise((resolve, reject) => {
+              const id = newRequestId();
+              callbacksMap.set(id, { resolve, reject });
+              realParent.postMessage({ type: 'storageDelete', id, key, shared }, '*');
+            });
+          },
+          list: (prefix, shared = false) => {
+            return new Promise((resolve, reject) => {
+              const id = newRequestId();
+              callbacksMap.set(id, { resolve, reject });
+              realParent.postMessage({ type: 'storageList', id, prefix, shared }, '*');
+            });
+          }
+        };
+
+        let pendingBlobs = new Map();
+        URL.createObjectURL = (blob) => {
+          // Store the blob and create an ID and URL for it
+          const blobId = `blob-${Date.now()}-${Math.random()}`;
+          pendingBlobs.set(blobId, blob);
+          return `blob-request://${blobId}`;
+        };
+
+        URL.revokeObjectURL = (url) => {
+          // Remove the blob from our store
+          const blobId = url.replace("blob-request://", "");
+          pendingBlobs.delete(blobId);
+        };
+
+        const getBlobFromURL = (url) => {
+          const blobId = url.replace("blob-request://", "");
+          return pendingBlobs.get(blobId);
+        };
+
+        // Override global fetch with streaming support
+        window.fetch = (url, init = {}) => {
+          return new Promise((resolve, reject) => {
+            const id = newRequestId();
+            const channelId = `fetch-${id}-${Date.now()}`;
+            
+            callbacksMap.set(id, { 
+              resolve: (response) => {
+                // Null-body statuses: Response(stream, {status: 204}) throws
+                // per the Fetch spec, which would escape this resolver and
+                // hang the artifact's await forever.
+                if (response.status === 204 || response.status === 205 || response.status === 304) {
+                  try {
+                    resolve(new Response(null, {
+                      status: response.status,
+                      statusText: response.statusText,
+                      headers: response.headers
+                    }));
+                  } catch (err) {
+                    // Invalid statusText/header bytes can throw here too.
+                    reject(new TypeError(
+                      'Bridge fetch: unconstructable response (status ' + response.status + ')'
+                    ));
+                  }
+                  return;
+                }
+                // Create a ReadableStream for the response body
+                const stream = new ReadableStream({
+                  start(controller) {
+                    streamControllers.set(channelId, controller);
+                  },
+                  cancel() {
+                    streamControllers.delete(channelId);
+                  }
+                });
+                
+                // Create and return the Response with the stream. Response()
+                // requires status in [200, 599]; an opaque/no-cors fetch
+                // forwards status 0, which would throw here and escape the
+                // resolver, hanging the artifact's await. Surface it as a
+                // network-error-shaped rejection instead.
+                try {
+                  resolve(new Response(stream, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: response.headers
+                  }));
+                } catch (err) {
+                  streamControllers.delete(channelId);
+                  reject(new TypeError(
+                    'Bridge fetch: unconstructable response (status ' + response.status + ')'
+                  ));
+                }
+              },
+              reject,
+              channelId
+            });
+            
+            realParent.postMessage({
+              type: 'proxyFetch',
+              id,
+              url,
+              init,
+              channelId
+            }, '*');
+          });
+        };
+
+        window.addEventListener('message', async (event) => {
+          // Only the embedding parent may drive the bridge — sibling and
+          // nested frames can also postMessage into this window.
+          if (event.source !== realParent) return;
+          if (event.data.type === 'takeScreenshot') {
+            // Echo the request's nonce so the requester can correlate the
+            // reply to ITS request — a reply without the expected nonce
+            // (e.g. from a stale pre-remount artifact) is ignored upstream.
+            const screenshotNonce = event.data.nonce;
+            const rootElement = document.getElementById('artifacts-component-root-html');
+            if (!rootElement) {
+              realParent.postMessage({
+                type: 'screenshotError',
+                nonce: screenshotNonce,
+                error: new Error('Root element not found'),
+              }, '*');
+              return;
+            }
+            // Catch CDN load failures and toPng errors so the parent always
+            // gets a response instead of hanging forever.
+            try {
+              const htmlToImage = await loadHtmlToImage();
+              const screenshot = await htmlToImage.toPng(rootElement, {
+                imagePlaceholder:
+                  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAA1JREFUGFdjePDgwX8ACOQDoNsk0PMAAAAASUVORK5CYII=",
+              });
+              realParent.postMessage({
+                type: 'screenshotData',
+                nonce: screenshotNonce,
+                data: screenshot,
+              }, '*');
+            } catch (err) {
+              realParent.postMessage({
+                type: 'screenshotError',
+                nonce: screenshotNonce,
+                error: err instanceof Error ? err : new Error(String(err)),
+              }, '*');
+            }
+          } else if (event.data.type === 'claudeComplete') {
+            const callback = callbacksMap.get(event.data.id);
+            if (!callback) return;
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+            } else {
+              callback.resolve(event.data.completion);
+            }
+            callbacksMap.delete(event.data.id);
+          } else if (event.data.type === 'proxyFetchResponse') {
+            const callback = callbacksMap.get(event.data.id);
+            if (!callback) return;
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+              callbacksMap.delete(event.data.id);
+            } else {
+              // Initial response with headers, status, etc.
+              callback.resolve({
+                status: event.data.status,
+                statusText: event.data.statusText,
+                headers: event.data.headers
+              });
+              // Don't delete the callback yet if streaming
+              if (!event.data.body) {
+                callbacksMap.delete(event.data.id);
+              }
+            }
+          } else if (event.data.type === 'proxyFetchStream') {
+            // Handle streaming data chunks
+            const controller = streamControllers.get(event.data.channelId);
+            if (controller) {
+              if (event.data.error) {
+                controller.error(new Error(event.data.error));
+                streamControllers.delete(event.data.channelId);
+              } else if (event.data.done) {
+                controller.close();
+                streamControllers.delete(event.data.channelId);
+                // Clean up the callback
+                const callback = Array.from(callbacksMap.entries()).find(
+                  ([_, value]) => value.channelId === event.data.channelId
+                );
+                if (callback) {
+                  callbacksMap.delete(callback[0]);
+                }
+              } else if (event.data.chunk) {
+                controller.enqueue(new Uint8Array(event.data.chunk));
+              }
+            }
+          } else if (event.data.type === 'storageGet') {
+            const callback = callbacksMap.get(event.data.id);
+            if (!callback) return;
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+            } else {
+              callback.resolve(event.data.result);
+            }
+            callbacksMap.delete(event.data.id);
+          } else if (event.data.type === 'storageSet') {
+            const callback = callbacksMap.get(event.data.id);
+            if (!callback) return;
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+            } else {
+              callback.resolve(event.data.result);
+            }
+            callbacksMap.delete(event.data.id);
+          } else if (event.data.type === 'storageDelete') {
+            const callback = callbacksMap.get(event.data.id);
+            if (!callback) return;
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+            } else {
+              callback.resolve(event.data.result);
+            }
+            callbacksMap.delete(event.data.id);
+          } else if (event.data.type === 'storageList') {
+            const callback = callbacksMap.get(event.data.id);
+            if (!callback) return;
+            if (event.data.error) {
+              callback.reject(new Error(event.data.error));
+            } else {
+              callback.resolve(event.data.result);
+            }
+            callbacksMap.delete(event.data.id);
+          }
+        });
+
+        // An SVG <a> exposes href as an SVGAnimatedString; its baseVal is the attribute
+        // as written, so resolve it against the base URL as the browser does for an HTML <a>.
+        const resolvedHref = (linkEl) => {
+          if (typeof linkEl.href === "string") return linkEl.href;
+          const written = linkEl.href?.baseVal;
+          // A same-document SVG link, such as one that begins an animation, stays with the browser.
+          if (!written || written.trim().startsWith("#")) return "";
+          try {
+            return new RealURL(written, linkEl.baseURI).href;
+          } catch (error) {
+            return written;
+          }
+        };
+
+        // This frame's URL is about:srcdoc, so the browser resolves "#id" against the renderer
+        // page and would load that page in the frame instead of scrolling.
+        const sameDocumentFragment = (linkEl) => {
+          const written = linkEl.getAttribute("href")?.trim();
+          if (!written?.startsWith("#") || document.querySelector("base[href]")) return null;
+          return written.slice(1);
+        };
+
+        const scrollToFragment = (fragment) => {
+          let decoded = fragment;
+          try {
+            decoded = realDecodeURIComponent(fragment);
+          } catch (error) {}
+          let target = document.getElementById(fragment) ?? document.getElementById(decoded);
+          for (const named of target ? [] : document.getElementsByName(decoded)) {
+            if (named.localName === "a") {
+              target = named;
+              break;
+            }
+          }
+          if (target) {
+            target.scrollIntoView();
+          } else if (decoded.toLowerCase() === "top") {
+            window.scrollTo(0, 0);
+          } else {
+            return false;
+          }
+          return true;
+        };
+
+        // Same decoder as dataUrlFile in app/page.tsx; change both together.
+        const hexPair = /^[0-9a-f]{2}$/i;
+        const dataUrlFile = (href) => {
+          const hash = href.indexOf("#");
+          const url = hash === -1 ? href : href.slice(0, hash);
+          const comma = url.indexOf(",");
+          if (comma === -1) return null;
+          const header = url.slice(0, comma);
+          const payload = url.slice(comma + 1);
+          const mimeMatch = header.match(/data:([^;]+)/);
+          const mimeType = mimeMatch ? mimeMatch[1] : "application/octet-stream";
+          const declaredBase64 = header
+            .split(";")
+            .slice(1)
+            .some((param) => param.trim().toLowerCase() === "base64");
+          const type = mimeMatch ? mimeMatch[1].trim().toLowerCase() : "";
+          const binaryType = type !== "" && !type.startsWith("text/");
+          if (declaredBase64 || (binaryType && !payload.includes("%"))) {
+            let binary = null;
+            try {
+              binary = realAtob(
+                payload.replace(/%([0-9a-f]{2})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16))),
+              );
+            } catch (error) {
+              if (declaredBase64) return null;
+            }
+            if (binary !== null) {
+              const bytes = new Uint8Array(binary.length);
+              for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+              }
+              return { mimeType, data: bytes.buffer };
+            }
+          }
+          const input = new RealTextEncoder().encode(payload);
+          const bytes = new Uint8Array(input.length);
+          let length = 0;
+          for (let i = 0; i < input.length; i++) {
+            if (input[i] === 0x25 && i + 2 < input.length) {
+              const pair = String.fromCharCode(input[i + 1], input[i + 2]);
+              if (hexPair.test(pair)) {
+                bytes[length++] = parseInt(pair, 16);
+                i += 2;
+                continue;
+              }
+            }
+            bytes[length++] = input[i];
+          }
+          return { mimeType, data: bytes.slice(0, length).buffer };
+        };
+
+        window.addEventListener('click', (event) => {
+          // Not instanceof Element: an artifact's own top-level class Element shadows the global.
+          if (typeof event.target?.closest !== "function") return;
+    
+          const linkEl = event.target.closest("a");
+          const href = linkEl && resolvedHref(linkEl);
+          if (!href) return;
+
+          const fragment = sameDocumentFragment(linkEl);
+          if (fragment !== null) {
+            const handledByArtifact = event.defaultPrevented;
+            event.preventDefault();
+            if (handledByArtifact || fragment === "" || scrollToFragment(fragment)) return;
+            // A fragment that names nothing in the artifact may name something in the host,
+            // such as a project thread. The artifact's own listeners still see the click.
+            realParent.postMessage({ type: 'openExternal', href }, '*');
+            return;
+          }
+          const filename = linkEl.getAttribute("download") ?? "";
+    
+          event.preventDefault();
+          event.stopImmediatePropagation();
+    
+          if (href.startsWith("blob-request:")) {
+            const blob = getBlobFromURL(href);
+            if (!blob) return;
+            void blob.arrayBuffer().then((data) => {
+              realParent.postMessage({
+                type: "downloadFile",
+                filename,
+                data,
+                mimeType: blob.type || "application/octet-stream",
+              });
+            });
+          } else if (href.startsWith("data:")) {
+            const file = dataUrlFile(href);
+            if (!file) return;
+            realParent.postMessage({
+              type: "downloadFile",
+              filename,
+              data: file.data,
+              mimeType: file.mimeType,
+            });
+          } else {
+            let linkUrl;
+            try {
+              linkUrl = new URL(href);
+            } catch (error) {
+              return;
+            }
+    
+            if (linkUrl.hostname === window.location.hostname) return;
+      
+            realParent.postMessage({
+              type: 'openExternal',
+              href,
+            }, '*');
+          }
+      });
+
+        const originalOpen = window.open;
+        window.open = function (url) {
+          realParent.postMessage({
+            type: "openExternal",
+            href: url,
+          }, "*");
+        };
+
+        window.addEventListener('error', (event) => {
+          realParent.postMessage({ type: 'console', message: 'Uncaught Error: ' + event.message }, '*');
+        });
+      })();
+    </script>
+  <style id="claude-scrollbar">@layer claude-scrollbar{*{scrollbar-width:thin}html{scrollbar-color:rgb(128 128 128 / 50%) transparent}}</style><script>
+(function () {
+  "use strict";
+  if (window.__coworkHtmlReviewGuest) return;
+  window.__coworkHtmlReviewGuest = true;
+
+  var READY_TYPE = "__cowork_html_review_ready__";
+  var SEL_CLASS = "__cwhr-sel";
+  var CONTEXT_LEN = 32;
+  var EXACT_CAP = 1000;
+  var port = null;
+  var mode = false;
+  var pins = [];
+  var quotes = [];
+  // Resolved Range per quote id; invalidated on DOM mutation and on a
+  // fresh quotes set. Scroll/resize re-reports just re-read
+  // getClientRects() from the cached Range. Null prototype - ids are
+  // collaborator-writable and must not collide with Object.prototype.
+  var quoteRanges = Object.create(null);
+  var hoverEl = null;
+  var selected = null;
+  var hasTextSel = false;
+  var rafPending = false;
+  // Capture before page body scripts can shadow them; start() defers
+  // to DOMContentLoaded which page code can race.
+  var _MessageChannel = window.MessageChannel;
+  var _topPost = window.top.postMessage.bind(window.top);
+
+  function visibleText(el) {
+    // innerText drops display:none/visibility:hidden subtrees; keep an
+    // empty innerText (icon-only el) rather than falling through to
+    // textContent which would re-include hidden text.
+    var t = typeof el.innerText === "string" ? el.innerText : (el.textContent || "");
+    return t.replace(/\s+/g, " ").trim();
+  }
+
+  // Comment-mode cursor: see HTML_PREVIEW_COMMENT_CURSOR above.
+  var BUBBLE_CURSOR = "url(\"data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'24'%20height%3D'24'%20viewBox%3D'0%200%2024%2024'%3E%3Cpath%20d%3D'M12%20.5h0A11.5%2011.5%200%200%201%2023.5%2012v0A11.5%2011.5%200%200%201%2012%2023.5H2.5a2%202%200%200%201-2-2V12A11.5%2011.5%200%200%201%2012%20.5Z'%20fill%3D'%23fff'%20stroke%3D'rgba(0%2C0%2C0%2C0.22)'%20stroke-width%3D'1'%2F%3E%3C%2Fsvg%3E\") 1 23, url(\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAACjklEQVR4AbRWS2gaURR9TGpiFTUEWpKQkA+EruqizWcRSBRT/G8KKpXiyo0ra1fVNiDFLmypFUo3iht/iO4Uay1FGwtFECl1p6KWLly4CGqrSMTY+wRFQ7WhGYd7Zu697845b+7M8B6BJh+UxcXFG3a7XeTxeHQAC+C12+1+ZLPZhHgMbp8FjLWxAkaj8U48Hg8lEomfIpEoLBaLLTKZTAd4LJFI3kD8HsZ+xGKxoMFgYI9T+JvAtUAg8FylUn3hcDj8ra0t6vLyMmKxWIhCofSAfZyDMRqXy+Wr1eqvPp/vKYjMAEZsRMDpdN6MRCKf+Xz+8cbGBm2kckIAtXShUGgKh8Mnfr9/Ybh0IKDT6a4vLS19EggE+wwGY7jmUj6TyUTQyv35+fmP0MbBexkISKVS+97e3u1LsU0oAo67Go3G1i/pCZjN5t3Nzc0H/zPzPlH/ip8EWvbQYrHs4hwWmN3e3n62traGfZy7MtbX12fYbPYTIKIQOzs7C6urq/cgINVWVlaO4EtjEXq9nken06mksgMZtJthtVp5xNzcHBsEIEWu0Wg0RKVS2USz2WTigFx6hPCkMTfRarXgB6WQzd/j63Q6bdK+nB7j0KnRaCCCIMpTE4D2oEql8m1qAvV6/VSr1U5PIJvN+qFjv6fyBIVC4ZfD4XgJAmekC9RqNZROp1+FQqESCCDSBWCVO1EoFC8wOQZpAnjm0Wj0O/xX94H4HNAzotvtNnreFU6lUgllMplAMpnclcvlp8NURC6Xi8BLGc5N9NvtNqpWq6hcLqN8Pn8OLUkAMe/g4EAOG4WzizcTJpPpA6zFIpfL9Ra2I45/IRgM2lKp1LtisXjs9XpvHR4eHimVythF4n78BwAA//8r8OPFAAAABklEQVQDAPCY8Oae0TJxAAAAAElFTkSuQmCC\") 1 23, default";
+
+  function injectStyle() {
+    var style = document.createElement("style");
+    // Hover box is painted by the host (from streamed rects); the guest
+    // marks the selected element and, in comment mode, swaps the native
+    // cursor for the comment bubble (forced, so page cursor styles don't
+    // fight the picker). While a composer or thread card is open the arrow
+    // returns, so the bubble cursor and the pin just placed never show at
+    // once. Keyed on <html> data attributes, which page scripts that
+    // rewrite body.className leave alone; ":not(#_)" lifts the rules to
+    // id-level specificity so a page's own !important cursor rules lose.
+    var ANY = ":not(#__cwhr_)";
+    var MODE = "html[data-cwhr-mode]";
+    var COMPOSING = MODE + "[data-cwhr-composing]";
+    style.textContent =
+      "." + SEL_CLASS + "{outline:1px solid hsl(40 70% 40%) !important;outline-offset:0;}" +
+      MODE + ANY + "," + MODE + " " + ANY + "{cursor:" + BUBBLE_CURSOR + " !important;}" +
+      COMPOSING + ANY + "," + COMPOSING + " " + ANY + "{cursor:default !important;}";
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  function isUnique(sel) {
+    try {
+      return document.querySelectorAll(sel).length === 1;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // Mirrors the host's stripInvisibles ranges. The host strips these
+  // from stored selectors, so a selector built on a value containing
+  // them would validate here but never match again - skip those rungs
+  // and fall through to the structural ladder instead.
+  function hasInvisibles(s) {
+    for (var i = 0; i < s.length; i++) {
+      var c = s.codePointAt(i);
+      if (c > 0xffff) i++;
+      if (
+        c <= 0x1f ||
+        c === 0x061c ||
+        c === 0x070f ||
+        c === 0xad ||
+        (c >= 0x7f && c <= 0x9f) ||
+        c === 0x115f ||
+        c === 0x1160 ||
+        c === 0x180e ||
+        (c >= 0x200b && c <= 0x200f) ||
+        (c >= 0x202a && c <= 0x202e) ||
+        (c >= 0x2060 && c <= 0x2064) ||
+        (c >= 0x2066 && c <= 0x2069) ||
+        c === 0x3164 ||
+        c === 0xfeff ||
+        (c >= 0xfff9 && c <= 0xfffb) ||
+        c === 0xffa0 ||
+        (c >= 0xe0000 && c <= 0xe007f)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function escapeAttr(v) {
+    return String(v).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  }
+
+  // Selector ladder: unique #id -> unique [data-*] -> structural
+  // tag:nth-of-type path rooted at the nearest unique-id ancestor.
+  function selectorFor(el) {
+    if (el.id && !hasInvisibles(el.id) && isUnique("#" + CSS.escape(el.id))) {
+      return "#" + CSS.escape(el.id);
+    }
+    for (var i = 0; i < el.attributes.length; i++) {
+      var attr = el.attributes[i];
+      if (
+        attr.name.indexOf("data-") === 0 &&
+        attr.value &&
+        !hasInvisibles(attr.value)
+      ) {
+        var dataSel = "[" + attr.name + '="' + escapeAttr(attr.value) + '"]';
+        if (isUnique(dataSel)) return dataSel;
+      }
+    }
+    var parts = [];
+    var cur = el;
+    while (cur && cur !== document.body && cur.nodeType === 1 && parts.length < 10) {
+      var sel = cur.tagName.toLowerCase();
+      var parent = cur.parentElement;
+      if (parent) {
+        var sameTag = [];
+        for (var c = 0; c < parent.children.length; c++) {
+          if (parent.children[c].tagName === cur.tagName) sameTag.push(parent.children[c]);
+        }
+        if (sameTag.length > 1) {
+          sel += ":nth-of-type(" + (sameTag.indexOf(cur) + 1) + ")";
+        }
+      }
+      parts.unshift(sel);
+      if (
+        parent &&
+        parent.id &&
+        !hasInvisibles(parent.id) &&
+        isUnique("#" + CSS.escape(parent.id))
+      ) {
+        parts.unshift("#" + CSS.escape(parent.id));
+        return parts.join(" > ");
+      }
+      cur = parent;
+    }
+    if (cur === document.body) {
+      parts.unshift("body");
+      return parts.join(" > ");
+    }
+    // Depth cap hit without a root - an unrooted chain would match the
+    // first structural pattern anywhere in the document. Mark the pin
+    // detached instead of attaching it to the wrong element.
+    return ":not(*)";
+  }
+
+  function descriptorFor(el) {
+    var tag = "<" + el.tagName.toLowerCase() + ">";
+    var idPart = el.id ? " #" + el.id : "";
+    var text = visibleText(el).slice(0, 60);
+    var textPart = text ? ' "' + text + '"' : "";
+    // Nearest id'd ancestor, skipping the UCR-injected
+    // #artifacts-component-root-* wrapper which is implementation noise.
+    var section = el.parentElement;
+    while (
+      section &&
+      (!section.id || section.id.indexOf("artifacts-component-root") === 0)
+    ) {
+      section = section.parentElement;
+    }
+    var sectionPart = section && section.id ? " in #" + section.id : "";
+    return (tag + idPart + textPart + sectionPart).slice(0, 400);
+  }
+
+  // textContent offset of (node, offset) within body - the coordinate
+  // system text-quote anchors are stored in. -1 when the boundary
+  // isn't under body (shadow root, detached).
+  function textOffset(node, offset) {
+    var body = document.body;
+    if (!body) return -1;
+    try {
+      var pre = document.createRange();
+      pre.selectNodeContents(body);
+      pre.setEnd(node, offset);
+      return pre.toString().length;
+    } catch (e) {
+      return -1;
+    }
+  }
+
+  // Inverse: build a Range covering [start, end) in body.textContent.
+  function rangeForOffsets(start, end) {
+    var body = document.body;
+    if (!body) return null;
+    var walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+    var acc = 0;
+    var range = document.createRange();
+    var haveStart = false;
+    var t;
+    while ((t = walker.nextNode())) {
+      var next = acc + t.length;
+      if (!haveStart && start < next) {
+        range.setStart(t, start - acc);
+        haveStart = true;
+      }
+      if (haveStart && end <= next) {
+        range.setEnd(t, end - acc);
+        return range;
+      }
+      acc = next;
+    }
+    return null;
+  }
+
+  // Context-scored search (W3C text-quote resolution): slice-check the
+  // hint, else pick the occurrence whose surrounding chars best match
+  // prefix/suffix. MIRRORS locateTextQuote() above line-for-line - the
+  // tested export is the contract; this copy is what the sandbox runs.
+  function locateQuote(text, q) {
+    var ex = q.exact;
+    if (!ex) return null;
+    var hint = q.startOffset >= 0 ? q.startOffset : 0;
+    if (text.slice(hint, hint + ex.length) === ex) {
+      return { start: hint, end: hint + ex.length };
+    }
+    var best = -1;
+    var bestScore = -1;
+    var bestDist = Infinity;
+    var scanned = 0;
+    for (var idx = text.indexOf(ex); idx !== -1 && ++scanned <= 1000; idx = text.indexOf(ex, idx + 1)) {
+      var before = text.slice(Math.max(0, idx - CONTEXT_LEN), idx);
+      var after = text.slice(idx + ex.length, idx + ex.length + CONTEXT_LEN);
+      var sc = 0;
+      for (var i = 1; i <= q.prefix.length && i <= before.length; i++) {
+        if (q.prefix[q.prefix.length - i] !== before[before.length - i]) break;
+        sc++;
+      }
+      for (var j = 0; j < q.suffix.length && j < after.length; j++) {
+        if (q.suffix[j] !== after[j]) break;
+        sc++;
+      }
+      var dist = Math.abs(idx - hint);
+      if (sc > bestScore || (sc === bestScore && dist < bestDist)) {
+        best = idx;
+        bestScore = sc;
+        bestDist = dist;
+      }
+    }
+    return best === -1 ? null : { start: best, end: best + ex.length };
+  }
+
+  function collectLineRects(range, cap) {
+    var out = [];
+    var rects = range.getClientRects();
+    for (var i = 0; i < rects.length && out.length < cap; i++) {
+      var r = rects[i];
+      if (r.width > 0 && r.height > 0) {
+        out.push({ x: r.left, y: r.top, w: r.width, h: r.height });
+      }
+    }
+    return out;
+  }
+
+  function reportTextSel(full) {
+    if (!port) return;
+    var sel = window.getSelection();
+    var r = sel && !sel.isCollapsed && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+    if (!r || !document.body || !document.body.contains(r.commonAncestorContainer)) {
+      if (hasTextSel) {
+        hasTextSel = false;
+        port.postMessage({ type: "textClear" });
+      }
+      return;
+    }
+    hasTextSel = true;
+    var br = r.getBoundingClientRect();
+    var msg = {
+      type: "textCapture",
+      rect: { x: br.left, y: br.top, w: br.width, h: br.height },
+      lineRects: collectLineRects(r, 80),
+    };
+    if (full) {
+      var live = document.body.textContent || "";
+      var so = textOffset(r.startContainer, r.startOffset);
+      var eo = textOffset(r.endContainer, r.endOffset);
+      if (so < 0 || eo < 0 || eo <= so) {
+        // Unanchorable selection (shadow root, foreign node). A
+        // rect-only post here would make the host pair the new rect
+        // with a stale prior anchor - clear instead.
+        hasTextSel = false;
+        port.postMessage({ type: "textClear" });
+        return;
+      }
+      // Denomination invariant: exact/prefix/suffix are byte-identical
+      // slices of body.textContent. Truncation adjusts endOffset so
+      // the host's (endOffset - startOffset === exact.length) shape
+      // check holds. Cut points back off surrogate halves - a lone
+      // surrogate would never relocate and fails UTF-8 persist.
+      var capped = Math.min(eo, so + EXACT_CAP);
+      if (capped < eo) {
+        var hc = live.charCodeAt(capped - 1);
+        if (hc >= 0xd800 && hc <= 0xdbff) capped--;
+      }
+      if (capped <= so) {
+        port.postMessage(msg);
+        return;
+      }
+      var pStart = Math.max(0, so - CONTEXT_LEN);
+      var pc = live.charCodeAt(pStart);
+      if (pc >= 0xdc00 && pc <= 0xdfff) pStart++;
+      var sEnd = Math.min(live.length, capped + CONTEXT_LEN);
+      if (sEnd < live.length) {
+        var sc = live.charCodeAt(sEnd - 1);
+        if (sc >= 0xd800 && sc <= 0xdbff) sEnd--;
+      }
+      msg.exact = live.slice(so, capped);
+      msg.prefix = live.slice(pStart, so);
+      msg.suffix = live.slice(capped, sEnd);
+      msg.startOffset = so;
+      msg.endOffset = capped;
+    }
+    port.postMessage(msg);
+  }
+
+  function clearSelection() {
+    if (selected) {
+      selected.classList.remove(SEL_CLASS);
+      selected = null;
+    }
+  }
+
+  // rAF-throttled cursor + hover-rect stream so the host can paint the
+  // inspector hover box (and knows the pointer is present) in comment mode.
+  var cursorPending = false;
+  var cursorX = -1;
+  var cursorY = -1;
+  function flushCursor() {
+    cursorPending = false;
+    if (!port) return;
+    var hover = null;
+    if (
+      hoverEl &&
+      hoverEl.nodeType === 1 &&
+      hoverEl !== document.body &&
+      hoverEl !== document.documentElement
+    ) {
+      var r = hoverEl.getBoundingClientRect();
+      if (r.width > 0 || r.height > 0) {
+        hover = { x: r.left, y: r.top, w: r.width, h: r.height };
+      }
+    }
+    port.postMessage({ type: "cursor", x: cursorX, y: cursorY, hover: hover });
+  }
+  function scheduleCursor() {
+    if (!cursorPending) {
+      cursorPending = true;
+      requestAnimationFrame(flushCursor);
+    }
+  }
+  function onMouseMove(ev) {
+    if (!mode || !port) return;
+    // Over the scrollbar gutter (clientX/Y past the content box) - hide
+    // the hover box like a leave.
+    var de = document.documentElement;
+    if (ev.clientX >= de.clientWidth || ev.clientY >= de.clientHeight) {
+      cursorX = -1;
+      cursorY = -1;
+      hoverEl = null;
+      scheduleCursor();
+      return;
+    }
+    cursorX = ev.clientX;
+    cursorY = ev.clientY;
+    hoverEl = ev.target;
+    scheduleCursor();
+  }
+  function onMouseLeave() {
+    if (!mode || !port) return;
+    cursorX = -1;
+    cursorY = -1;
+    hoverEl = null;
+    scheduleCursor();
+  }
+
+  function onClick(ev) {
+    if (!port) return;
+    if (!mode) {
+      // Mode off: don't intercept the page, just let the host close any
+      // open popover (thread card click-away). A non-collapsed selection
+      // means the click ended a drag-select - not a click-away.
+      var s = window.getSelection();
+      if (!s || s.isCollapsed) port.postMessage({ type: "clickAway" });
+      return;
+    }
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+    var el = ev.target;
+    if (!el || el.nodeType !== 1 || el === document.documentElement) return;
+    if (el === document.body && el.firstElementChild) {
+      // Pin on body is rarely intentional; keep it anyway but as body.
+    }
+    clearSelection();
+    selected = el;
+    el.classList.add(SEL_CLASS);
+    var rect = el.getBoundingClientRect();
+    var pinX = rect.width > 0 ? (ev.clientX - rect.left) / rect.width : 0.5;
+    var pinY = rect.height > 0 ? (ev.clientY - rect.top) / rect.height : 0.5;
+    port.postMessage({
+      type: "capture",
+      selector: selectorFor(el).slice(0, 1000),
+      textHint: visibleText(el).slice(0, 300),
+      descriptor: descriptorFor(el),
+      pinX: Math.min(1, Math.max(0, pinX)),
+      pinY: Math.min(1, Math.max(0, pinY)),
+      clientX: ev.clientX,
+      clientY: ev.clientY,
+      rectLeft: rect.left,
+      rectTop: rect.top,
+    });
+  }
+
+  function reportRects() {
+    rafPending = false;
+    if (!port) return;
+    // Selected element's live bounds - keeps the host's draft pin /
+    // inspector tag / composer glued through scroll and reflow.
+    if (selected) {
+      var sr = selected.getBoundingClientRect();
+      port.postMessage({
+        type: "selRect",
+        left: sr.left,
+        top: sr.top,
+        w: sr.width,
+        h: sr.height,
+        found:
+          (sr.width > 0 || sr.height > 0) &&
+          document.documentElement.contains(selected),
+      });
+    }
+    var rects = [];
+    for (var i = 0; i < pins.length; i++) {
+      var p = pins[i];
+      var el = null;
+      try {
+        el = document.querySelector(p.selector);
+      } catch (e) {
+        el = null;
+      }
+      if (!el) {
+        rects.push({ id: p.id, x: 0, y: 0, found: false });
+        continue;
+      }
+      var r = el.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) {
+        rects.push({ id: p.id, x: 0, y: 0, found: false });
+        continue;
+      }
+      rects.push({
+        id: p.id,
+        x: r.left + p.pinX * r.width,
+        y: r.top + p.pinY * r.height,
+        found: true,
+      });
+    }
+    var quoteRects = [];
+    if (quotes.length > 0) {
+      var live = null;
+      for (var qi = 0; qi < quotes.length; qi++) {
+        var q = quotes[qi];
+        var qr = quoteRanges[q.id];
+        if (qr === undefined) {
+          if (live === null) {
+            live = (document.body && document.body.textContent) || "";
+          }
+          var loc = locateQuote(live, q);
+          qr = (loc && rangeForOffsets(loc.start, loc.end)) || null;
+          quoteRanges[q.id] = qr;
+        }
+        // Zero paintable rects (display:none subtree) reports as
+        // not-found so the host docks it as detached instead of
+        // rendering nothing clickable.
+        var qlr = qr ? collectLineRects(qr, 80) : [];
+        quoteRects.push(
+          qlr.length > 0
+            ? { id: q.id, found: true, lineRects: qlr }
+            : { id: q.id, found: false, lineRects: [] }
+        );
+      }
+    }
+    port.postMessage({
+      type: "rects",
+      rects: rects,
+      quoteRects: quoteRects,
+      scrollY: window.scrollY || 0,
+    });
+  }
+
+  function scheduleRects() {
+    if (rafPending) return;
+    rafPending = true;
+    var done = false;
+    function run() {
+      if (done) return;
+      done = true;
+      reportRects();
+    }
+    // rAF for paint alignment, with a timeout fallback - rAF is
+    // suspended entirely in hidden tabs and pins must still settle
+    // when the tab becomes visible after background loading.
+    requestAnimationFrame(run);
+    setTimeout(run, 150);
+  }
+
+  function setMode(on) {
+    mode = !!on;
+    document.documentElement.toggleAttribute("data-cwhr-mode", mode);
+    if (!mode) {
+      hoverEl = null;
+      clearSelection();
+    }
+  }
+
+  function setComposing(open) {
+    document.documentElement.toggleAttribute("data-cwhr-composing", !!open);
+  }
+
+  function onPortMessage(ev) {
+    var data = ev.data;
+    if (!data) return;
+    if (data.type === "mode") setMode(data.on);
+    else if (data.type === "composing") setComposing(data.open);
+    else if (data.type === "pins") {
+      pins = Array.isArray(data.pins) ? data.pins : [];
+      scheduleRects();
+    } else if (data.type === "quotes") {
+      quotes = Array.isArray(data.quotes) ? data.quotes : [];
+      quoteRanges = Object.create(null);
+      scheduleRects();
+    } else if (data.type === "clearSelection") {
+      clearSelection();
+    } else if (data.type === "clearTextSel") {
+      var ts = window.getSelection();
+      if (ts) ts.removeAllRanges();
+      hasTextSel = false;
+    } else if (data.type === "restoreScroll") {
+      var ry = Number(data.y);
+      if (isFinite(ry) && ry > 0) {
+        // Apply now and again at load - late images/fonts can grow the
+        // document after the first attempt clamps short.
+        window.scrollTo(0, ry);
+        window.addEventListener("load", function () {
+          window.scrollTo(0, ry);
+        });
+      }
+    }
+  }
+
+  function start() {
+    injectStyle();
+    var channel = new _MessageChannel();
+    port = channel.port1;
+    port.onmessage = onPortMessage;
+    // Sandboxed srcdoc origins can be opaque; "*" is required. The
+    // payload carries only the mount token (multiple sandboxes can be
+    // mounted at once - the token routes the port to the right overlay)
+    // and the channel port itself is pairwise-secure.
+    _topPost(
+      { type: READY_TYPE, token: "1ae3d740-202e-478d-a95c-899a42f2e951" },
+      "*",
+      [channel.port2]
+    );
+    document.addEventListener("mousemove", onMouseMove, true);
+    // documentElement (not document, capture) so this fires only when the
+    // pointer leaves the viewport - capture-phase on document would fire for
+    // every intra-document element-boundary crossing.
+    document.documentElement.addEventListener("mouseleave", onMouseLeave);
+    document.addEventListener("click", onClick, true);
+    // Text-selection capture: commit on mouseup/keyup (Shift+Arrow),
+    // clear on collapse. Not mode-gated; highlight-to-comment is
+    // always on.
+    function onSelCommit() { reportTextSel(true); }
+    document.addEventListener("mouseup", onSelCommit, true);
+    document.addEventListener("keyup", onSelCommit, true);
+    document.addEventListener("selectionchange", function () {
+      var s = window.getSelection();
+      if (hasTextSel && (!s || s.isCollapsed)) reportTextSel(false);
+    });
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape" && port) port.postMessage({ type: "dismiss" });
+    }, true);
+    // Scroll/resize move the hovered element under a stationary pointer -
+    // re-report its rect so the host's inspector box tracks it. Mutations
+    // stay rects-only (animating pages would chatter the cursor stream).
+    var textSelPending = false;
+    function scheduleTextSel() {
+      if (textSelPending) return;
+      textSelPending = true;
+      requestAnimationFrame(function () {
+        textSelPending = false;
+        reportTextSel(false);
+      });
+    }
+    function onLayoutChange() {
+      scheduleRects();
+      if (mode && hoverEl) scheduleCursor();
+      if (hasTextSel) scheduleTextSel();
+    }
+    window.addEventListener("scroll", onLayoutChange, true);
+    window.addEventListener("resize", onLayoutChange);
+    // Full-cache invalidate per childList mutation is acceptable: CSS
+    // animation doesn't fire the observer; JS writers at frame rate
+    // would re-relocate every frame but are rare. characterData isn't
+    // observed, so .data= edits leave highlights stale until the next
+    // childList mutation.
+    var observer = new MutationObserver(function () {
+      quoteRanges = Object.create(null);
+      scheduleRects();
+      if (hasTextSel) scheduleTextSel();
+    });
+    function observe() {
+      if (document.body) observer.observe(document.body, { childList: true, subtree: true });
+    }
+    if (document.body) observe();
+    else document.addEventListener("DOMContentLoaded", observe);
+    // Settle pins after late layout (fonts, images).
+    setInterval(scheduleRects, 2000);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start);
+  } else {
+    start();
+  }
+})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kadane &amp; Prefix Sum Console — Data Engineer Prep</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #10141B;
+    --bg-panel: #171D26;
+    --bg-panel-raised: #1D2530;
+    --line: #2A3341;
+    --line-soft: #212933;
+    --text: #E8ECF1;
+    --text-muted: #8B96A5;
+    --text-dim: #5C6675;
+    --amber: #F2B84B;
+    --amber-dim: #7A6534;
+    --teal: #5FD4C7;
+    --teal-dim: #2B5A54;
+    --rose: #E8836F;
+    --violet: #B79CF2;
+    --violet-dim: #4A3E6B;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Inter', sans-serif;
+    --display: 'Space Grotesk', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -5%, rgba(95,212,199,0.07), transparent),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(242,184,75,0.06), transparent),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  [contenteditable="true"]:hover{outline:1px dashed var(--teal-dim); outline-offset:2px; border-radius:4px;}
+  [contenteditable="true"]:focus{outline:1px solid var(--teal); outline-offset:2px; border-radius:4px;}
+
+  .topbar{
+    border-bottom:1px solid var(--line);
+    padding:14px 28px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    position:sticky;
+    top:0;
+    background:rgba(16,20,27,0.92);
+    backdrop-filter:blur(10px);
+    z-index:50;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .topbar-left{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13px;color:var(--text-dim);}
+  .dot-row{display:flex;gap:6px;}
+  .dot{width:9px;height:9px;border-radius:50%;}
+  .dot.r{background:#E8836F;} .dot.y{background:#F2B84B;} .dot.g{background:#5FD4C7;}
+  .topbar-actions{display:flex;gap:8px;}
+  .btn{
+    font-family:var(--mono);
+    font-size:12px;
+    padding:7px 13px;
+    border-radius:6px;
+    border:1px solid var(--line);
+    background:var(--bg-panel);
+    color:var(--text-muted);
+    cursor:pointer;
+    transition:border-color .15s, color .15s, background .15s;
+  }
+  .btn:hover{border-color:var(--teal-dim);color:var(--text);}
+  .btn.on{background:var(--teal);color:var(--bg);border-color:var(--teal);font-weight:600;}
+
+  .hero{max-width:960px;margin:0 auto;padding:56px 28px 36px;}
+  .eyebrow{
+    font-family:var(--mono);font-size:12.5px;letter-spacing:0.12em;color:var(--teal);
+    text-transform:uppercase;display:flex;align-items:center;gap:10px;margin-bottom:18px;
+  }
+  .eyebrow::before{content:'❯';color:var(--amber);font-weight:700;}
+  h1{font-family:var(--display);font-size:40px;line-height:1.12;margin:0 0 16px;font-weight:700;letter-spacing:-0.01em;}
+  h1 .hl{color:var(--amber);}
+  h1 .hl2{color:var(--violet);}
+  .lede{color:var(--text-muted);font-size:16px;max-width:680px;margin:0 0 26px;}
+  .lede b{color:var(--text);font-weight:600;}
+  .meta-row{display:flex;flex-wrap:wrap;gap:10px;font-family:var(--mono);font-size:12px;}
+  .chip{border:1px solid var(--line);background:var(--bg-panel);color:var(--text-muted);padding:6px 12px;border-radius:20px;}
+  .chip b{color:var(--text);}
+
+  .section-wrap{max-width:960px;margin:0 auto;padding:0 28px 40px;}
+  .section-title{
+    font-family:var(--mono);font-size:12px;color:var(--text-dim);text-transform:uppercase;
+    letter-spacing:0.1em;margin-bottom:14px;display:flex;align-items:center;gap:8px;
+  }
+  .section-title::after{content:'';flex:1;height:1px;background:var(--line-soft);}
+
+  .tips-card{
+    border:1px solid var(--line);border-radius:10px;background:var(--bg-panel);padding:20px 24px;
+  }
+  .tips-card ul{margin:0;padding-left:20px;}
+  .tips-card li{margin-bottom:8px;color:var(--text-muted);font-size:14.5px;}
+  .tips-card li::marker{color:var(--amber);}
+  .tips-card li b{color:var(--text);}
+
+  .quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:720px){.quick-grid{grid-template-columns:1fr;}}
+  .quick-card{
+    border:1px solid var(--line-soft);border-radius:10px;background:var(--bg-panel);padding:16px 18px;
+  }
+  .quick-card .qtitle{font-family:var(--display);font-size:16px;font-weight:600;margin:0 0 6px;}
+  .quick-card a{color:var(--teal);font-family:var(--mono);font-size:11.5px;text-decoration:none;word-break:break-all;}
+  .quick-card a:hover{text-decoration:underline;}
+  .quick-card .hint{
+    margin-top:10px;padding:9px 12px;background:var(--bg-panel-raised);border-left:2px solid var(--amber);
+    border-radius:0 6px 6px 0;font-size:13px;color:var(--text-muted);
+  }
+  .quick-card .hint b{color:var(--amber);}
+
+  .index-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(230px, 1fr));gap:8px;}
+  .index-item{
+    border:1px solid var(--line-soft);border-radius:8px;padding:10px 14px;text-decoration:none;
+    color:var(--text-muted);font-size:13.5px;display:flex;gap:10px;align-items:baseline;
+    transition:border-color .15s, color .15s, background .15s;
+  }
+  .index-item:hover{border-color:var(--teal-dim);color:var(--text);background:var(--bg-panel);}
+  .index-item .n{font-family:var(--mono);color:var(--amber);font-size:12px;}
+  .index-item.bonus .n{color:var(--violet);}
+
+  .stack{max-width:960px;margin:0 auto;padding:0 28px 100px;display:flex;flex-direction:column;gap:22px;}
+  .card{border:1px solid var(--line);border-radius:10px;background:var(--bg-panel);overflow:hidden;scroll-margin-top:80px;}
+  .card.bonus{border-color:var(--violet-dim);}
+  .card-head{padding:20px 24px 16px;border-bottom:1px solid var(--line-soft);}
+  .card-head-top{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;}
+  .qnum{font-family:var(--mono);font-size:12px;color:var(--bg);background:var(--amber);padding:2px 8px;border-radius:4px;font-weight:700;}
+  .qnum.bonus{background:var(--violet);}
+  .difficulty{
+    font-family:var(--mono);font-size:11px;letter-spacing:0.06em;padding:2px 9px;border-radius:20px;
+    border:1px solid;text-transform:uppercase;
+  }
+  .difficulty.easy{color:var(--teal);border-color:var(--teal-dim);}
+  .difficulty.med{color:var(--amber);border-color:var(--amber-dim);}
+  .difficulty.hard{color:var(--rose);border-color:#5E3A32;}
+  .bonus-tag{
+    font-family:var(--mono);font-size:11px;letter-spacing:0.06em;padding:2px 9px;border-radius:20px;
+    border:1px solid var(--violet-dim);color:var(--violet);text-transform:uppercase;
+  }
+  .card-link{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--teal);text-decoration:none;}
+  .card-link:hover{text-decoration:underline;}
+  .card-title{font-family:var(--display);font-size:21px;font-weight:600;margin:0 0 8px;}
+  .card-prompt{color:var(--text-muted);font-size:14.5px;margin:0;}
+  .card-prompt code{font-family:var(--mono);background:var(--bg-panel-raised);padding:1px 6px;border-radius:4px;font-size:13px;color:var(--teal);}
+
+  .card-body{padding:20px 24px 24px;}
+  .section-label{
+    font-family:var(--mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;
+    color:var(--text-dim);margin:18px 0 8px;display:flex;align-items:center;gap:8px;
+  }
+  .section-label:first-child{margin-top:0;}
+  .section-label::after{content:'';flex:1;height:1px;background:var(--line-soft);}
+
+  pre{
+    margin:0;background:#0C0F14;border:1px solid var(--line-soft);border-radius:8px;padding:14px 16px;
+    overflow-x:auto;font-family:var(--mono);font-size:12.6px;line-height:1.55;white-space:pre-wrap;
+  }
+  code{font-family:var(--mono);}
+  .kw{color:#C58AF2;} .str{color:#A8D97A;} .com{color:var(--text-dim);font-style:italic;} .fn{color:var(--teal);} .num{color:#E8836F;}
+
+  .io-pair{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media (max-width:720px){.io-pair{grid-template-columns:1fr;}}
+  .io-block{background:#0C0F14;border:1px solid var(--line-soft);border-radius:8px;padding:12px 14px;}
+  .io-block h4{font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:0 0 6px;text-transform:uppercase;letter-spacing:.06em;}
+  .io-block .val{font-family:var(--mono);font-size:13px;color:var(--text);}
+
+  details.solution{
+    margin-top:20px;border:1px dashed var(--line);border-radius:8px;
+    background:linear-gradient(180deg, rgba(95,212,199,0.03), transparent);
+  }
+  details.solution summary{
+    list-style:none;cursor:pointer;padding:13px 18px;display:flex;align-items:center;gap:10px;
+    font-family:var(--mono);font-size:13px;color:var(--teal);user-select:none;
+  }
+  details.solution summary::-webkit-details-marker{display:none;}
+  details.solution summary::before{content:'▶';font-size:10px;color:var(--text-dim);transition:transform .18s ease;}
+  details.solution[open] summary::before{transform:rotate(90deg);}
+  details.solution summary .prompt-txt{color:var(--text-dim);}
+  details.solution summary .exec{color:var(--amber);}
+  details.solution[open] summary{border-bottom:1px solid var(--line-soft);}
+  .solution-inner{padding:16px 18px 20px;}
+  .approach{
+    color:var(--text-muted);font-size:13.5px;margin:0 0 14px;padding:10px 14px;
+    background:var(--bg-panel-raised);border-left:2px solid var(--teal);border-radius:0 6px 6px 0;
+  }
+  .de-angle{
+    margin-top:14px;padding:10px 14px;background:var(--bg-panel-raised);border-left:2px solid var(--violet);
+    border-radius:0 6px 6px 0;font-size:13.5px;color:var(--text-muted);
+  }
+  .de-angle b{color:var(--violet);}
+
+  footer{
+    max-width:960px;margin:0 auto;padding:0 28px 60px;font-family:var(--mono);font-size:12px;
+    color:var(--text-dim);border-top:1px solid var(--line-soft);padding-top:24px;
+  }
+  footer .blink{color:var(--teal);}
+
+  a.chip.jump{text-decoration:none;}
+  a.chip.jump:hover{border-color:var(--teal-dim);color:var(--text);}
+  .topic-banner{max-width:960px;margin:20px auto 28px;padding:22px 28px;border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:10px;background:var(--bg-panel);scroll-margin-top:80px;}
+  .topic-banner .topic-num{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--amber);}
+  .topic-banner h2{font-family:var(--display);font-size:28px;margin:4px 0 6px;}
+  .topic-banner p{margin:0;color:var(--text-muted);font-size:14.5px;}
+  .topic-banner code{font-family:var(--mono);background:var(--bg-panel-raised);padding:1px 6px;border-radius:4px;color:var(--teal);font-size:13px;}
+  .tips-card code,.quick-card code{font-family:var(--mono);background:var(--bg-panel-raised);padding:1px 6px;border-radius:4px;color:var(--teal);font-size:12.5px;}
+  @media (max-width:1000px){.topic-banner{margin-left:28px;margin-right:28px;}}
+</style>
+<style>.__cwhr-sel{outline:1px solid hsl(40 70% 40%) !important;outline-offset:0;}html[data-cwhr-mode]:not(#__cwhr_),html[data-cwhr-mode] :not(#__cwhr_){cursor:url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'24'%20height%3D'24'%20viewBox%3D'0%200%2024%2024'%3E%3Cpath%20d%3D'M12%20.5h0A11.5%2011.5%200%200%201%2023.5%2012v0A11.5%2011.5%200%200%201%2012%2023.5H2.5a2%202%200%200%201-2-2V12A11.5%2011.5%200%200%201%2012%20.5Z'%20fill%3D'%23fff'%20stroke%3D'rgba(0%2C0%2C0%2C0.22)'%20stroke-width%3D'1'%2F%3E%3C%2Fsvg%3E") 1 23, url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAACjklEQVR4AbRWS2gaURR9TGpiFTUEWpKQkA+EruqizWcRSBRT/G8KKpXiyo0ra1fVNiDFLmypFUo3iht/iO4Uay1FGwtFECl1p6KWLly4CGqrSMTY+wRFQ7WhGYd7Zu697845b+7M8B6BJh+UxcXFG3a7XeTxeHQAC+C12+1+ZLPZhHgMbp8FjLWxAkaj8U48Hg8lEomfIpEoLBaLLTKZTAd4LJFI3kD8HsZ+xGKxoMFgYI9T+JvAtUAg8FylUn3hcDj8ra0t6vLyMmKxWIhCofSAfZyDMRqXy+Wr1eqvPp/vKYjMAEZsRMDpdN6MRCKf+Xz+8cbGBm2kckIAtXShUGgKh8Mnfr9/Ybh0IKDT6a4vLS19EggE+wwGY7jmUj6TyUTQyv35+fmP0MbBexkISKVS+97e3u1LsU0oAo67Go3G1i/pCZjN5t3Nzc0H/zPzPlH/ip8EWvbQYrHs4hwWmN3e3n62traGfZy7MtbX12fYbPYTIKIQOzs7C6urq/cgINVWVlaO4EtjEXq9nken06mksgMZtJthtVp5xNzcHBsEIEWu0Wg0RKVS2USz2WTigFx6hPCkMTfRarXgB6WQzd/j63Q6bdK+nB7j0KnRaCCCIMpTE4D2oEql8m1qAvV6/VSr1U5PIJvN+qFjv6fyBIVC4ZfD4XgJAmekC9RqNZROp1+FQqESCCDSBWCVO1EoFC8wOQZpAnjm0Wj0O/xX94H4HNAzotvtNnreFU6lUgllMplAMpnclcvlp8NURC6Xi8BLGc5N9NvtNqpWq6hcLqN8Pn8OLUkAMe/g4EAOG4WzizcTJpPpA6zFIpfL9Ra2I45/IRgM2lKp1LtisXjs9XpvHR4eHimVythF4n78BwAA//8r8OPFAAAABklEQVQDAPCY8Oae0TJxAAAAAElFTkSuQmCC") 1 23, default !important;}html[data-cwhr-mode][data-cwhr-composing]:not(#__cwhr_),html[data-cwhr-mode][data-cwhr-composing] :not(#__cwhr_){cursor:default !important;}</style></head>
+<body id="artifacts-component-root-html">
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="dot-row"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div>
+    kadane_prefix_sum_prep.py
+  </div>
+  <div class="topbar-actions">
+    <button class="btn" id="editToggle">✏️ Edit mode: off</button>
+    <button class="btn" id="downloadBtn">⬇ Save edited copy</button>
+  </div>
+</div>
+
+<div class="hero">
+  <div class="eyebrow">practice set · kadane's algorithm &amp; prefix sum</div>
+  <h1>Kadane + Prefix Sum for your <span class="hl">FAANG</span> / <span class="hl2">Senior Data Engineer</span> loop</h1>
+  <p class="lede" contenteditable="true">
+    Two topics on one page. <b>Topic 1: Kadane's algorithm</b> (6 problems + 1 bonus) with fresh solutions.
+    <b>Topic 2: Prefix Sum</b> (6 problems) using <b>your own notebook solutions, copied as-is</b>.
+    Click <b>"Edit mode"</b> to edit anything, then <b>"Save edited copy"</b> to download your version.
+  </p>
+  <div class="meta-row">
+    <a class="chip jump" href="#topic-kadane"><b>Topic 1</b> · Kadane (7)</a>
+    <a class="chip jump" href="#topic-prefix"><b>Topic 2</b> · Prefix Sum (6)</a>
+    <div class="chip"><b>13</b> problems</div>
+    <div class="chip">Editable in-browser</div>
+  </div>
+</div>
+
+<!-- ============ TOPIC 1: KADANE ============ -->
+<div class="topic-banner" id="topic-kadane">
+  <span class="topic-num">TOPIC 1</span>
+  <h2>Kadane's Algorithm</h2>
+  <p>Best subarray ending at each index: either extend the previous best or start fresh.</p>
+</div>
+
+<div class="section-wrap">
+  <div class="section-title">General tips</div>
+  <div class="tips-card">
+    <ul contenteditable="true">
+      <li><b>Core recurrence:</b> <code>cur = max(x, cur + x)</code>, then <code>best = max(best, cur)</code>. In words: if the running sum so far is negative, it only hurts, so restart at x.</li>
+      <li><b>Initialise with nums[0], not 0</b>, when the subarray must be non-empty. Otherwise an all-negative array wrongly returns 0 instead of the largest (least negative) element.</li>
+      <li><b>Min version is the mirror image:</b> swap max for min. Maximum absolute sum = run both and take <code>max(max_sum, abs(min_sum))</code>.</li>
+      <li><b>Products need two trackers.</b> A negative flips the biggest into the smallest, so keep both a running max and a running min.</li>
+      <li><b>Circular arrays:</b> answer = max(normal Kadane max, total - min subarray). Edge case: if every element is negative, the circular trick would select an empty array, so return the normal max.</li>
+      <li><b>One deletion:</b> keep two states per index, "no deletion yet" and "one element already deleted", and transition between them.</li>
+      <li>Kadane works with negatives (unlike sliding window), runs in <b>O(n) time and O(1) space</b>, and is really a 1-D dynamic programming problem. Say that out loud.</li>
+      <li>If asked for the <b>subarray itself</b>, not just the sum, track a temp start index that resets whenever you restart, and copy it to (best_start, best_end) on improvement.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="section-wrap">
+  <div class="section-title">Quick revision problems</div>
+  <div class="quick-grid">
+    <div class="quick-card">
+      <h3 class="qtitle" contenteditable="true">Maximum Subarray (medium)</h3>
+      <a href="https://leetcode.com/problems/maximum-subarray/" target="_blank" rel="noopener">leetcode.com/problems/maximum-subarray</a>
+      <div class="hint" contenteditable="true"><b>Hint:</b> <code>cur = max(x, cur + x)</code>; start both cur and best at nums[0].</div>
+    </div>
+    <div class="quick-card">
+      <h3 class="qtitle" contenteditable="true">Maximum Product Subarray (medium)</h3>
+      <a href="https://leetcode.com/problems/maximum-product-subarray/" target="_blank" rel="noopener">leetcode.com/problems/maximum-product-subarray</a>
+      <div class="hint" contenteditable="true"><b>Hint:</b> Track current max AND current min; a negative number swaps their roles. Zeros reset both naturally via the (x, ...) candidate.</div>
+    </div>
+    <div class="quick-card">
+      <h3 class="qtitle" contenteditable="true">Maximum Sum Circular Subarray (medium)</h3>
+      <a href="https://leetcode.com/problems/maximum-sum-circular-subarray/" target="_blank" rel="noopener">leetcode.com/problems/maximum-sum-circular-subarray</a>
+      <div class="hint" contenteditable="true"><b>Hint:</b> <code>max(kadane_max, total - kadane_min)</code>, but if kadane_max is negative return it directly.</div>
+    </div>
+  </div>
+</div>
+
+<div class="section-wrap">
+  <div class="section-title">Jump to a problem · Kadane</div>
+  <div class="index-grid" id="indexGridKadane"><a href="#k-max-subarray" class="index-item"><span class="n">K01</span> Maximum Subarray Sum</a><a href="#k-min-subarray" class="index-item"><span class="n">K02</span> Minimum Subarray Sum</a><a href="#k-max-product" class="index-item"><span class="n">K03</span> Maximum Product Subarray</a><a href="#k-one-deletion" class="index-item"><span class="n">K04</span> Maximum Subarray Sum with One Deletion</a><a href="#k-max-absolute-sum" class="index-item"><span class="n">K05</span> Maximum Absolute Sum of Any Subarray</a><a href="#k-circular" class="index-item"><span class="n">K06</span> Maximum Sum in Circular Array</a><a href="#k-stock" class="index-item bonus"><span class="n">K07</span> Best Time to Buy and Sell Stock ✦</a></div>
+</div>
+<div class="stack" id="stackKadane"><div class="card" id="k-max-subarray">
+    <div class="card-head">
+      <div class="card-head-top">
+        <span class="qnum ">K01</span>
+        <span class="difficulty med">Medium</span>
+        
+        
+        <a class="card-link" href="https://leetcode.com/problems/maximum-subarray/" target="_blank" rel="noopener">https://leetcode.com/problems/maximum-subarray/</a>
+      </div>
+      <h3 class="card-title" contenteditable="true">Maximum Subarray Sum</h3>
+      <p class="card-prompt" contenteditable="true">Given an integer array, find the contiguous subarray (at least one element) with the <code>largest sum</code> and return that sum.</p>
+    </div>
+    <div class="card-body">
+      <div class="section-label">Sample Input / Output</div>
+      <div class="io-pair">
+        <div class="io-block"><h4>Input</h4><div class="val" contenteditable="true">nums = [-2, 1, -3, 4, -1, 2, 1, -5, 4]</div></div>
+        <div class="io-block"><h4>Output</h4><div class="val" contenteditable="true">6   (subarray [4, -1, 2, 1])</div></div>
+      </div>
+      <details class="solution">
+        <summary><span class="prompt-txt">#</span> <span class="exec">Reveal approach &amp; solution</span> <span class="prompt-txt">(try it yourself first)</span></summary>
+        <div class="solution-inner">
+          <p class="approach" contenteditable="true"><b>Approach:</b> Kadane's algorithm. At each element, the best subarray ending here is either the element alone or the previous best plus this element. Keep a global best. O(n) time, O(1) space. The second function shows how to also return the subarray boundaries.</p>
+          <pre><code contenteditable="true"><span class="kw">def</span> max_subarray(nums):
+    cur = best = nums[<span class="num">0</span>]
+    <span class="kw">for</span> x <span class="kw">in</span> nums[<span class="num">1</span>:]:
+        cur = max(x, cur + x)
+        best = max(best, cur)
+    <span class="kw">return</span> best
+
+
+<span class="com"># variant: also return the subarray indices</span>
+<span class="kw">def</span> max_subarray_with_indices(nums):
+    cur = best = nums[<span class="num">0</span>]
+    start = best_start = best_end = <span class="num">0</span>
+    <span class="kw">for</span> i <span class="kw">in</span> range(<span class="num">1</span>, len(nums)):
+        <span class="kw">if</span> nums[i] &gt; cur + nums[i]:
+            cur = nums[i]
+            start = i
+        <span class="kw">else</span>:
+            cur += nums[i]
+        <span class="kw">if</span> cur &gt; best:
+            best = cur
+            best_start, best_end = start, i
+    <span class="kw">return</span> best, best_start, best_end</code></pre>
+          <div class="de-angle" contenteditable="true"><b>DE interview angle:</b> Follow-up: "do this over a stream or a partitioned dataset." Each partition keeps (total, best prefix, best suffix, best subarray), and these four values merge associatively, so it parallelises as a reduce.</div>
+        </div>
+      </details>
+    </div></div><div class="card" id="k-min-subarray">
+    <div class="card-head">
+      <div class="card-head-top">
+        <span class="qnum ">K02</span>
+        <span class="difficulty easy">Easy</span>
+        
+        
+        <a class="card-link" href="https://www.geeksforgeeks.org/problems/smallest-sum-contiguous-subarray/1" target="_blank" rel="noopener">https://www.geeksforgeeks.org/problems/smallest-sum-contiguous-subarray/1</a>
+      </div>
+      <h3 class="card-title" contenteditable="true">Minimum Subarray Sum</h3>
+      <p class="card-prompt" contenteditable="true">Given an integer array, find the contiguous subarray with the <code>smallest sum</code> and return that sum.</p>
+    </div>
+    <div class="card-body">
+      <div class="section-label">Sample Input / Output</div>
+      <div class="io-pair">
+        <div class="io-block"><h4>Input</h4><div class="val" contenteditable="true">arr = [3, -4, 2, -3, -1, 7, -5]</div></div>
+        <div class="io-block"><h4>Output</h4><div class="val" contenteditable="true">-6   (subarray [-4, 2, -3, -1])</div></div>
+      </div>
+      <details class="solution">
+        <summary><span class="prompt-txt">#</span> <span class="exec">Reveal approach &amp; solution</span> <span class="prompt-txt">(try it yourself first)</span></summary>
+        <div class="solution-inner">
+          <p class="approach" contenteditable="true"><b>Approach:</b> Mirror image of Kadane: replace max with min. The best subarray ending here is the element alone or the previous minimum plus this element.</p>
+          <pre><code contenteditable="true"><span class="kw">def</span> min_subarray(arr):
+    cur = best = arr[<span class="num">0</span>]
+    <span class="kw">for</span> x <span class="kw">in</span> arr[<span class="num">1</span>:]:
+        cur = min(x, cur + x)
+        best = min(best, cur)
+    <span class="kw">return</span> best</code></pre>
+          <div class="de-angle" contenteditable="true"><b>DE interview angle:</b> Follow-up: where would you use it? Finding the worst drawdown or the worst consecutive stretch in a daily net-change series. It is also the building block for the circular and absolute-sum variants below.</div>
+        </div>
+      </details>
+    </div></div><div class="card" id="k-max-product">
+    <div class="card-head">
+      <div class="card-head-top">
+        <span class="qnum ">K03</span>
+        <span class="difficulty med">Medium</span>
+        
+        
+        <a class="card-link" href="https://leetcode.com/problems/maximum-product-subarray/" target="_blank" rel="noopener">https://leetcode.com/problems/maximum-product-subarray/</a>
+      </div>
+      <h3 class="card-title" contenteditable="true">Maximum Product Subarray</h3>
+      <p class="card-prompt" contenteditable="true">Given an integer array, find the contiguous subarray with the <code>largest product</code> and return that product.</p>
+    </div>
+    <div class="card-body">
+      <div class="section-label">Sample Input / Output</div>
+      <div class="io-pair">
+        <div class="io-block"><h4>Input</h4><div class="val" contenteditable="true">nums = [2, 3, -2, 4]   and   nums = [-2, 0, -1]</div></div>
+        <div class="io-block"><h4>Output</h4><div class="val" contenteditable="true">6   and   0</div></div>
+      </div>
+      <details class="solution">
+        <summary><span class="prompt-txt">#</span> <span class="exec">Reveal approach &amp; solution</span> <span class="prompt-txt">(try it yourself first)</span></summary>
+        <div class="solution-inner">
+          <p class="approach" contenteditable="true"><b>Approach:</b> A negative number can turn the smallest product into the largest, so track both the max and the min product ending at each index. For each x, the candidates are x alone, cur_max * x, and cur_min * x. A zero naturally resets both trackers because the lone-x candidate wins.</p>
+          <pre><code contenteditable="true"><span class="kw">def</span> max_product(nums):
+    cur_max = cur_min = best = nums[<span class="num">0</span>]
+    <span class="kw">for</span> x <span class="kw">in</span> nums[<span class="num">1</span>:]:
+        candidates = (x, cur_max * x, cur_min * x)
+        cur_max, cur_min = max(candidates), min(candidates)
+        best = max(best, cur_max)
+    <span class="kw">return</span> best</code></pre>
+          <div class="de-angle" contenteditable="true"><b>DE interview angle:</b> Follow-up: "why not just track the max?" Because of sign flips, shown with [-2, 3, -4]. In the data world, products show up as compounding growth rates or cumulative probabilities (often handled with logs to avoid overflow).</div>
+        </div>
+      </details>
+    </div></div><div class="card" id="k-one-deletion">
+    <div class="card-head">
+      <div class="card-head-top">
+        <span class="qnum ">K04</span>
+        <span class="difficulty med">Medium</span>
+        
+        
+        <a class="card-link" href="https://leetcode.com/problems/maximum-subarray-sum-with-one-deletion/description/" target="_blank" rel="noopener">https://leetcode.com/problems/maximum-subarray-sum-with-one-deletion/description/</a>
+      </div>
+      <h3 class="card-title" contenteditable="true">Maximum Subarray Sum with One Deletion</h3>
+      <p class="card-prompt" contenteditable="true">Return the maximum sum of a non-empty subarray after <code>optionally deleting at most one element</code> from it (the result must still be non-empty).</p>
+    </div>
+    <div class="card-body">
+      <div class="section-label">Sample Input / Output</div>
+      <div class="io-pair">
+        <div class="io-block"><h4>Input</h4><div class="val" contenteditable="true">arr = [1, -2, 0, 3]   and   arr = [-1, -1, -1, -1]</div></div>
+        <div class="io-block"><h4>Output</h4><div class="val" contenteditable="true">4   (drop -2, giving [1, 0, 3])   and   -1</div></div>
+      </div>
+      <details class="solution">
+        <summary><span class="prompt-txt">#</span> <span class="exec">Reveal approach &amp; solution</span> <span class="prompt-txt">(try it yourself first)</span></summary>
+        <div class="solution-inner">
+          <p class="approach" contenteditable="true"><b>Approach:</b> Two states per index. no_del = best subarray ending here with nothing deleted (plain Kadane). one_del = best ending here with exactly one deletion: either we delete the current element (take the previous no_del) or we keep it and extend an earlier deletion (one_del + x). The answer is the best of both states across the array.</p>
+          <pre><code contenteditable="true"><span class="kw">def</span> maximum_sum(arr):
+    no_del = best = arr[<span class="num">0</span>]
+    one_del = float(<span class="str">'-inf'</span>)
+    <span class="kw">for</span> x <span class="kw">in</span> arr[<span class="num">1</span>:]:
+        one_del = max(one_del + x, no_del)   <span class="com"># keep x after a deletion, or delete x itself</span>
+        no_del = max(no_del + x, x)          <span class="com"># plain Kadane</span>
+        best = max(best, no_del, one_del)
+    <span class="kw">return</span> best</code></pre>
+          <div class="de-angle" contenteditable="true"><b>DE interview angle:</b> Follow-up: "what if you could delete k elements?" That becomes a DP with a state per number of deletions used: O(n * k). Naming the generalisation shows you see the pattern as DP, not a trick.</div>
+        </div>
+      </details>
+    </div></div><div class="card" id="k-max-absolute-sum">
+    <div class="card-head">
+      <div class="card-head-top">
+        <span class="qnum ">K05</span>
+        <span class="difficulty med">Medium</span>
+        
+        
+        <a class="card-link" href="https://leetcode.com/problems/maximum-absolute-sum-of-any-subarray/" target="_blank" rel="noopener">https://leetcode.com/problems/maximum-absolute-sum-of-any-subarray/</a>
+      </div>
+      <h3 class="card-title" contenteditable="true">Maximum Absolute Sum of Any Subarray</h3>
+      <p class="card-prompt" contenteditable="true">Return the maximum <code>absolute value</code> of the sum of any subarray. An empty subarray (sum 0) is allowed.</p>
+    </div>
+    <div class="card-body">
+      <div class="section-label">Sample Input / Output</div>
+      <div class="io-pair">
+        <div class="io-block"><h4>Input</h4><div class="val" contenteditable="true">nums = [1, -3, 2, 3, -4]   and   nums = [2, -5, 1, -4, 3, -2]</div></div>
+        <div class="io-block"><h4>Output</h4><div class="val" contenteditable="true">5   and   8</div></div>
+      </div>
+      <details class="solution">
+        <summary><span class="prompt-txt">#</span> <span class="exec">Reveal approach &amp; solution</span> <span class="prompt-txt">(try it yourself first)</span></summary>
+        <div class="solution-inner">
+          <p class="approach" contenteditable="true"><b>Approach:</b> The largest absolute sum is either the largest positive subarray sum or the most negative one, so run max-Kadane and min-Kadane together. Clamping at 0 (cur_max never below 0, cur_min never above 0) handles the allowed empty subarray.</p>
+          <pre><code contenteditable="true"><span class="kw">def</span> max_absolute_sum(nums):
+    cur_max = cur_min = best = <span class="num">0</span>
+    <span class="kw">for</span> x <span class="kw">in</span> nums:
+        cur_max = max(<span class="num">0</span>, cur_max + x)
+        cur_min = min(<span class="num">0</span>, cur_min + x)
+        best = max(best, cur_max, -cur_min)
+    <span class="kw">return</span> best</code></pre>
+          <div class="de-angle" contenteditable="true"><b>DE interview angle:</b> Follow-up: equivalent to max(prefix) - min(prefix) over the prefix sums, which is a great one-line alternative to mention. In analytics terms, the largest swing in a running balance.</div>
+        </div>
+      </details>
+    </div></div><div class="card" id="k-circular">
+    <div class="card-head">
+      <div class="card-head-top">
+        <span class="qnum ">K06</span>
+        <span class="difficulty med">Medium</span>
+        
+        
+        <a class="card-link" href="https://leetcode.com/problems/maximum-sum-circular-subarray/" target="_blank" rel="noopener">https://leetcode.com/problems/maximum-sum-circular-subarray/</a>
+      </div>
+      <h3 class="card-title" contenteditable="true">Maximum Sum in Circular Array</h3>
+      <p class="card-prompt" contenteditable="true">Given a circular integer array, return the <code>maximum sum</code> of a non-empty subarray, where the subarray may wrap around the end.</p>
+    </div>
+    <div class="card-body">
+      <div class="section-label">Sample Input / Output</div>
+      <div class="io-pair">
+        <div class="io-block"><h4>Input</h4><div class="val" contenteditable="true">nums = [5, -3, 5]   and   nums = [-3, -2, -3]</div></div>
+        <div class="io-block"><h4>Output</h4><div class="val" contenteditable="true">10   (wraps: 5 + 5)   and   -2</div></div>
+      </div>
+      <details class="solution">
+        <summary><span class="prompt-txt">#</span> <span class="exec">Reveal approach &amp; solution</span> <span class="prompt-txt">(try it yourself first)</span></summary>
+        <div class="solution-inner">
+          <p class="approach" contenteditable="true"><b>Approach:</b> Two cases. (1) The best subarray does not wrap: plain Kadane max. (2) It wraps: then the elements left out form a contiguous minimum subarray, so the answer is total - min_subarray. Take the larger. Edge case: if the plain max is negative, all elements are negative and case 2 would pick an empty set, so return the plain max.</p>
+          <pre><code contenteditable="true"><span class="kw">def</span> max_subarray_circular(nums):
+    total = <span class="num">0</span>
+    cur_max = cur_min = <span class="num">0</span>
+    best_max = float(<span class="str">'-inf'</span>)
+    best_min = float(<span class="str">'inf'</span>)
+    <span class="kw">for</span> x <span class="kw">in</span> nums:
+        total += x
+        cur_max = max(x, cur_max + x)
+        best_max = max(best_max, cur_max)
+        cur_min = min(x, cur_min + x)
+        best_min = min(best_min, cur_min)
+    <span class="kw">if</span> best_max &lt; <span class="num">0</span>:
+        <span class="kw">return</span> best_max
+    <span class="kw">return</span> max(best_max, total - best_min)</code></pre>
+          <div class="de-angle" contenteditable="true"><b>DE interview angle:</b> Follow-up: "why does total - min work?" The wrap-around segment is the complement of a contiguous middle block, so maximising the wrap means minimising what you leave out. Stating that complement argument clearly is the senior-level signal here.</div>
+        </div>
+      </details>
+    </div></div><div class="card bonus" id="k-stock">
+    <div class="card-head">
+      <div class="card-head-top">
+        <span class="qnum bonus">K07</span>
+        <span class="difficulty easy">Easy</span>
+        <span class="bonus-tag">Bonus addition</span>
+        
+        <a class="card-link" href="https://leetcode.com/problems/best-time-to-buy-and-sell-stock/" target="_blank" rel="noopener">https://leetcode.com/problems/best-time-to-buy-and-sell-stock/</a>
+      </div>
+      <h3 class="card-title" contenteditable="true">Best Time to Buy and Sell Stock</h3>
+      <p class="card-prompt" contenteditable="true">Given daily prices, return the <code>maximum profit</code> from one buy followed by one sell, or 0 if no profit is possible.</p>
+    </div>
+    <div class="card-body">
+      <div class="section-label">Sample Input / Output</div>
+      <div class="io-pair">
+        <div class="io-block"><h4>Input</h4><div class="val" contenteditable="true">prices = [7, 1, 5, 3, 6, 4]</div></div>
+        <div class="io-block"><h4>Output</h4><div class="val" contenteditable="true">5   (buy at 1, sell at 6)</div></div>
+      </div>
+      <details class="solution">
+        <summary><span class="prompt-txt">#</span> <span class="exec">Reveal approach &amp; solution</span> <span class="prompt-txt">(try it yourself first)</span></summary>
+        <div class="solution-inner">
+          <p class="approach" contenteditable="true"><b>Approach:</b> Kadane in disguise: it is the maximum subarray sum of the day-to-day price differences. The usual implementation tracks the lowest price so far and the best profit from selling today.</p>
+          <pre><code contenteditable="true"><span class="kw">def</span> max_profit(prices):
+    min_price = float(<span class="str">'inf'</span>)
+    best = <span class="num">0</span>
+    <span class="kw">for</span> p <span class="kw">in</span> prices:
+        min_price = min(min_price, p)
+        best = max(best, p - min_price)
+    <span class="kw">return</span> best</code></pre>
+          <div class="de-angle" contenteditable="true"><b>DE interview angle:</b> Bonus: spotting that this equals Kadane on the diff array is a nice pattern-recognition moment. Connect it to a window function: max(price - min(price) over (order by day rows unbounded preceding)).</div>
+        </div>
+      </details>
+    </div></div></div>
+
+<!-- ============ TOPIC 2: PREFIX SUM ============ -->
+<div class="topic-banner" id="topic-prefix">
+  <span class="topic-num">TOPIC 2</span>
+  <h2>Prefix Sum + Hash Map</h2>
+  <p>Solutions below are copied from your Databricks notebook as-is, including its own test values at the top of each snippet. Change <code>nums</code>/<code>k</code> to the sample input to dry-run.</p>
+</div>
+
+<div class="section-wrap">
+  <div class="section-title">General tips</div>
+  <div class="tips-card">
+    <ul contenteditable="true">
+      <li><b>Core idea:</b> a subarray sum is <code>prefix[j] - prefix[i]</code>. So "find a subarray with sum k" becomes "have I seen a prefix equal to <code>running - k</code> before?".</li>
+      <li><b>Counting problems</b> (how many subarrays): the dict stores <b>counts</b> of each prefix value, seeded with <code>{0: 1}</code> so subarrays starting at index 0 are counted.</li>
+      <li><b>Longest-length problems:</b> the dict stores the <b>first index</b> where each prefix appeared, seeded with <code>{0: -1}</code>. Never overwrite an existing key, since the earliest index gives the longest subarray.</li>
+      <li><b>Divisibility problems:</b> store <code>prefix % k</code> instead of the raw sum. Two equal remainders mean the sum between them is a multiple of k. Python's % returns a non-negative result for negatives, so no extra fix-up is needed (in Java/C++ add k then mod again).</li>
+      <li><b>Binary 0/1 equal-count problems:</b> map 0 to -1 so "equal zeros and ones" becomes "prefix returns to a previous value".</li>
+      <li><b>Minimum length of 2</b> (Continuous Subarray Sum): store the first index of each remainder and check that the gap is at least 2.</li>
+      <li>Works with negatives, unlike sliding window. Complexity is O(n) time, O(n) space (O(k) for remainder problems).</li>
+    </ul>
+  </div>
+</div>
+
+<div class="section-wrap">
+  <div class="section-title">Quick revision problems</div>
+  <div class="quick-grid">
+    <div class="quick-card">
+      <h3 class="qtitle" contenteditable="true">Subarray Sum Equals K (medium)</h3>
+      <a href="https://leetcode.com/problems/subarray-sum-equals-k/" target="_blank" rel="noopener">leetcode.com/problems/subarray-sum-equals-k</a>
+      <div class="hint" contenteditable="true"><b>Hint:</b> mp = {0: 1}; add <code>mp[prefix - k]</code> to the answer, then increment <code>mp[prefix]</code>.</div>
+    </div>
+    <div class="quick-card">
+      <h3 class="qtitle" contenteditable="true">Contiguous Array (medium)</h3>
+      <a href="https://leetcode.com/problems/contiguous-array/" target="_blank" rel="noopener">leetcode.com/problems/contiguous-array</a>
+      <div class="hint" contenteditable="true"><b>Hint:</b> 0 counts as -1, 1 as +1. mp = {0: -1}; store first occurrence only; answer is the max of <code>i - mp[prefix]</code>.</div>
+    </div>
+    <div class="quick-card">
+      <h3 class="qtitle" contenteditable="true">Continuous Subarray Sum (medium)</h3>
+      <a href="https://leetcode.com/problems/continuous-subarray-sum/" target="_blank" rel="noopener">leetcode.com/problems/continuous-subarray-sum</a>
+      <div class="hint" contenteditable="true"><b>Hint:</b> Store the first index of each <code>prefix % k</code>; true if the same remainder reappears at least 2 indices later (or the remainder is 0 at i &gt;= 1).</div>
+    </div>
+  </div>
+</div>
+
+<div class="section-wrap">
+  <div class="section-title">Jump to a problem · Prefix Sum</div>
+  <div class="index-grid" id="indexGridPrefix"><a href="#p-subarray-sum-k" class="index-item"><span class="n">P01</span> Subarray Sum Equals K</a><a href="#p-divisible-by-k" class="index-item"><span class="n">P02</span> Subarray Sums Divisible by K</a><a href="#p-binary-subarrays" class="index-item"><span class="n">P03</span> Binary Subarrays With Sum</a><a href="#p-contiguous-array" class="index-item"><span class="n">P04</span> Contiguous Array</a><a href="#p-max-length-sum-k" class="index-item"><span class="n">P05</span> Maximum Size Subarray Sum Equals K</a><a href="#p-continuous-subarray-sum" class="index-item"><span class="n">P06</span> Continuous Subarray Sum</a></div>
+</div>
+<div class="stack" id="stackPrefix"><div class="card" id="p-subarray-sum-k">
+    <div class="card-head">
+      <div class="card-head-top">
+        <span class="qnum ">P01</span>
+        <span class="difficulty med">Medium</span>
+        
+        <span class="bonus-tag" style="color:var(--teal);border-color:var(--teal-dim)">Your solution</span>
+        <a class="card-link" href="https://leetcode.com/problems/subarray-sum-equals-k/" target="_blank" rel="noopener">https://leetcode.com/problems/subarray-sum-equals-k/</a>
+      </div>
+      <h3 class="card-title" contenteditable="true">Subarray Sum Equals K</h3>
+      <p class="card-prompt" contenteditable="true">Given an integer array <code>nums</code> and an integer <code>k</code>, return the total number of subarrays whose sum equals k.</p>
+    </div>
+    <div class="card-body">
+      <div class="section-label">Sample Input / Output</div>
+      <div class="io-pair">
+        <div class="io-block"><h4>Input</h4><div class="val" contenteditable="true">nums = [1, 2, 3], k = 3</div></div>
+        <div class="io-block"><h4>Output</h4><div class="val" contenteditable="true">2   ([1, 2] and [3])</div></div>
+      </div>
+      <details class="solution">
+        <summary><span class="prompt-txt">#</span> <span class="exec">Reveal approach &amp; solution</span> <span class="prompt-txt">(try it yourself first)</span></summary>
+        <div class="solution-inner">
+          <p class="approach" contenteditable="true"><b>Approach:</b> Prefix sum with a dict of counts, seeded with {0: 1} (the empty prefix). If prefix_sum - k was seen before, each earlier occurrence marks a valid subarray ending at i. Then record the current prefix_sum.</p>
+          <pre><code contenteditable="true"><span class="com"># Subarray Sum Equals K</span>
+<span class="com"># Given an array of integers nums and an integer k, return the total number of subarrays whose sum equals to k.</span>
+<span class="com"># nums = [1,2,3]</span>
+<span class="com"># k = 3</span>
+nums = [<span class="num">1</span>]
+k = <span class="num">0</span>
+mp = {<span class="num">0</span>: <span class="num">1</span>}  <span class="com"># prefix sum 0 seen once (empty prefix)</span>
+
+prefix_sum = <span class="num">0</span>
+ans = <span class="num">0</span>
+<span class="kw">for</span> i <span class="kw">in</span> range(len(nums)):
+    prefix_sum += nums[i]
+
+    <span class="kw">if</span> prefix_sum - k <span class="kw">in</span> mp:
+        ans += mp[prefix_sum - k]
+    <span class="kw">if</span> prefix_sum <span class="kw">in</span> mp:
+        mp[prefix_sum] += <span class="num">1</span>
+    <span class="kw">else</span>:
+        mp[prefix_sum] = <span class="num">1</span>
+
+print(ans)</code></pre>
+          <div class="de-angle" contenteditable="true"><b>DE interview angle:</b> Follow-up: "why not sliding window?" Negatives break the monotonic grow/shrink logic, while prefix sums do not care about sign. In Spark/SQL terms, this is a self-join on running totals (prefix = prefix_prev + k).</div>
+        </div>
+      </details>
+    </div></div><div class="card" id="p-divisible-by-k">
+    <div class="card-head">
+      <div class="card-head-top">
+        <span class="qnum ">P02</span>
+        <span class="difficulty med">Medium</span>
+        
+        <span class="bonus-tag" style="color:var(--teal);border-color:var(--teal-dim)">Your solution</span>
+        <a class="card-link" href="https://leetcode.com/problems/subarray-sums-divisible-by-k/" target="_blank" rel="noopener">https://leetcode.com/problems/subarray-sums-divisible-by-k/</a>
+      </div>
+      <h3 class="card-title" contenteditable="true">Subarray Sums Divisible by K</h3>
+      <p class="card-prompt" contenteditable="true">Given an integer array <code>nums</code> and an integer <code>k</code>, return the number of non-empty subarrays whose sum is <code>divisible by k</code>.</p>
+    </div>
+    <div class="card-body">
+      <div class="section-label">Sample Input / Output</div>
+      <div class="io-pair">
+        <div class="io-block"><h4>Input</h4><div class="val" contenteditable="true">nums = [4, 5, 0, -2, -3, 1], k = 5</div></div>
+        <div class="io-block"><h4>Output</h4><div class="val" contenteditable="true">7</div></div>
+      </div>
+      <details class="solution">
+        <summary><span class="prompt-txt">#</span> <span class="exec">Reveal approach &amp; solution</span> <span class="prompt-txt">(try it yourself first)</span></summary>
+        <div class="solution-inner">
+          <p class="approach" contenteditable="true"><b>Approach:</b> Store counts of prefix_sum % k. Two equal remainders mean the subarray between them sums to a multiple of k. Seed with {0: 1}. Python's % is non-negative for negative numbers, so negatives need no special handling.</p>
+          <pre><code contenteditable="true"><span class="com"># Given an integer array nums and an integer k, return the number of non-empty subarrays that have a sum divisible by k.</span>
+
+<span class="com"># A subarray is a contiguous part of an array.</span>
+
+<span class="com"># Example 1:</span>
+
+<span class="com"># Input: nums = [4,5,0,-2,-3,1], k = 5</span>
+<span class="com"># Output: 7</span>
+<span class="com"># Explanation: There are 7 subarrays with a sum divisible by k = 5:</span>
+<span class="com"># [4, 5, 0, -2, -3, 1], [5], [5, 0], [5, 0, -2, -3], [0], [0, -2, -3], [-2, -3]</span>
+
+<span class="kw">def</span> subarraysDivByK(self, nums: List[int], k: int) -&gt; int:
+    mp = {<span class="num">0</span>: <span class="num">1</span>}
+    prefix_sum = <span class="num">0</span>
+    ans = <span class="num">0</span>
+
+    <span class="kw">for</span> num <span class="kw">in</span> nums:
+        prefix_sum += num
+
+        <span class="kw">if</span> (prefix_sum % k) <span class="kw">in</span> mp:
+            ans += mp[prefix_sum % k]
+
+        <span class="kw">if</span> (prefix_sum % k) <span class="kw">not</span> <span class="kw">in</span> mp:
+            mp[(prefix_sum % k)] = <span class="num">1</span>
+        <span class="kw">else</span>:
+            mp[(prefix_sum % k)]+=<span class="num">1</span>
+
+
+    <span class="kw">return</span>(ans)</code></pre>
+          <div class="de-angle" contenteditable="true"><b>DE interview angle:</b> Follow-up: the key is the pigeonhole insight: there are only k possible remainders, so space is O(k), not O(n). That bounded-state view is useful when the data is too large to hold every distinct prefix.</div>
+        </div>
+      </details>
+    </div></div><div class="card" id="p-binary-subarrays">
+    <div class="card-head">
+      <div class="card-head-top">
+        <span class="qnum ">P03</span>
+        <span class="difficulty med">Medium</span>
+        
+        <span class="bonus-tag" style="color:var(--teal);border-color:var(--teal-dim)">Your solution</span>
+        <a class="card-link" href="https://leetcode.com/problems/binary-subarrays-with-sum/" target="_blank" rel="noopener">https://leetcode.com/problems/binary-subarrays-with-sum/</a>
+      </div>
+      <h3 class="card-title" contenteditable="true">Binary Subarrays With Sum</h3>
+      <p class="card-prompt" contenteditable="true">Given a binary array <code>nums</code> and an integer <code>goal</code>, return the number of non-empty subarrays whose sum equals goal.</p>
+    </div>
+    <div class="card-body">
+      <div class="section-label">Sample Input / Output</div>
+      <div class="io-pair">
+        <div class="io-block"><h4>Input</h4><div class="val" contenteditable="true">nums = [1, 0, 1, 0, 1], goal = 2</div></div>
+        <div class="io-block"><h4>Output</h4><div class="val" contenteditable="true">4</div></div>
+      </div>
+      <details class="solution">
+        <summary><span class="prompt-txt">#</span> <span class="exec">Reveal approach &amp; solution</span> <span class="prompt-txt">(try it yourself first)</span></summary>
+        <div class="solution-inner">
+          <p class="approach" contenteditable="true"><b>Approach:</b> Exactly the Subarray Sum Equals K pattern with goal in place of k. Count how many times prefix_sum - goal has appeared. Handles the all-zeros case (goal = 0) correctly because of the {0: 1} seed.</p>
+          <pre><code contenteditable="true"><span class="com"># Given a binary array nums and an integer goal, return the number of non-empty subarrays with a sum goal.</span>
+
+<span class="com"># A subarray is a contiguous part of the array.</span>
+nums = [<span class="num">0</span>,<span class="num">0</span>,<span class="num">0</span>,<span class="num">0</span>,<span class="num">0</span>]
+goal = <span class="num">0</span>
+
+mp = {<span class="num">0</span>: <span class="num">1</span>}
+prefix_sum = <span class="num">0</span>
+ans = <span class="num">0</span>
+<span class="kw">for</span> i <span class="kw">in</span> range(len(nums)):
+    prefix_sum += nums[i]
+
+    <span class="kw">if</span> prefix_sum - goal <span class="kw">in</span> mp:
+        ans += mp[prefix_sum - goal]
+
+    <span class="kw">if</span> prefix_sum <span class="kw">in</span> mp:
+        mp[prefix_sum] += <span class="num">1</span>
+    <span class="kw">else</span>:
+        mp[prefix_sum] = <span class="num">1</span>
+
+print(ans)</code></pre>
+          <div class="de-angle" contenteditable="true"><b>DE interview angle:</b> Follow-up: because values are only 0/1, a sliding-window "at most goal minus at most goal-1" solution also works in O(1) space. Mention it as the alternative and say why prefix sums generalise better (they survive negatives).</div>
+        </div>
+      </details>
+    </div></div><div class="card" id="p-contiguous-array">
+    <div class="card-head">
+      <div class="card-head-top">
+        <span class="qnum ">P04</span>
+        <span class="difficulty med">Medium</span>
+        
+        <span class="bonus-tag" style="color:var(--teal);border-color:var(--teal-dim)">Your solution</span>
+        <a class="card-link" href="https://leetcode.com/problems/contiguous-array/" target="_blank" rel="noopener">https://leetcode.com/problems/contiguous-array/</a>
+      </div>
+      <h3 class="card-title" contenteditable="true">Contiguous Array</h3>
+      <p class="card-prompt" contenteditable="true">Given a binary array <code>nums</code>, return the <code>maximum length</code> of a contiguous subarray with an equal number of 0s and 1s.</p>
+    </div>
+    <div class="card-body">
+      <div class="section-label">Sample Input / Output</div>
+      <div class="io-pair">
+        <div class="io-block"><h4>Input</h4><div class="val" contenteditable="true">nums = [0, 1, 0]</div></div>
+        <div class="io-block"><h4>Output</h4><div class="val" contenteditable="true">2   ([0, 1] or [1, 0])</div></div>
+      </div>
+      <details class="solution" open="">
+        <summary><span class="prompt-txt">#</span> <span class="exec">Reveal approach &amp; solution</span> <span class="prompt-txt">(try it yourself first)</span></summary>
+        <div class="solution-inner">
+          <p class="approach" contenteditable="true"><b>Approach:</b> Treat 0 as -1 and 1 as +1. Equal counts means the running sum returns to a value seen before. Solution 1 stores the first index of each prefix sum with a {0: -1} seed and never overwrites it, since the earliest index gives the longest subarray. Solution 2 skips the seed and instead handles the case where the prefix sum itself equals the target (0) by setting ans = i + 1, which covers subarrays starting at index 0.</p>
+          <pre><code contenteditable="true"><span class="com"># ---------- Solution 1: seed the map with {0: -1} ----------</span>
+<span class="com"># Given a binary array nums, return the maximum length of a contiguous subarray with an equal number of 0 and 1.</span>
+nums = [<span class="num">0</span>, <span class="num">1</span>]
+
+mp = {<span class="num">0</span>: -<span class="num">1</span>}  <span class="com"># prefix sum 0 first seen at index -1 (before array starts)</span>
+prefix_sum = <span class="num">0</span>
+ans = <span class="num">0</span>
+
+<span class="kw">for</span> i <span class="kw">in</span> range(len(nums)):
+    <span class="com"># Treat 0 as -1, 1 as +1 so equal count means prefix_sum returns to a previous value</span>
+    <span class="kw">if</span> nums[i] == <span class="num">0</span>:
+        prefix_sum -= <span class="num">1</span>
+    <span class="kw">else</span>:
+        prefix_sum += <span class="num">1</span>
+
+    <span class="kw">if</span> prefix_sum <span class="kw">in</span> mp:
+        ans = max(ans, i - mp[prefix_sum])
+    <span class="kw">else</span>:
+        mp[prefix_sum] = i
+
+print(ans)
+
+
+<span class="com"># ---------- Solution 2: no seed, handle prefix == target separately ----------</span>
+<span class="kw">def</span> findMaxLength(self, nums: List[int]) -&gt; int:
+    mp = {}
+    ans = <span class="num">0</span>
+    prefix_sum = <span class="num">0</span>
+    target = <span class="num">0</span>
+
+
+    <span class="kw">for</span> i <span class="kw">in</span> range(len(nums)):
+        <span class="kw">if</span> nums[i]==<span class="num">0</span>:
+            prefix_sum -= <span class="num">1</span>
+        <span class="kw">else</span>:
+            prefix_sum += nums[i]
+
+        <span class="kw">if</span> prefix_sum == target:
+            ans = i+<span class="num">1</span>
+        <span class="kw">if</span> prefix_sum-target <span class="kw">in</span> mp:
+            ans = max(ans,(i-mp[prefix_sum-target]))
+        <span class="kw">if</span> prefix_sum <span class="kw">not</span> <span class="kw">in</span> mp:
+            mp[prefix_sum] = i
+
+    <span class="kw">return</span>(ans)</code></pre>
+          <div class="de-angle" contenteditable="true"><b>DE interview angle:</b> Follow-up: the "map 0 to -1" transformation is the trick to name out loud. The same idea solves "equal number of two categories" problems, e.g. balanced success/failure windows in an event log. Be ready to explain why both solutions are equivalent: the {0: -1} seed in Solution 1 does the same job as the explicit prefix == 0 check in Solution 2.</div>
+        </div>
+      </details>
+    </div></div><div class="card" id="p-max-length-sum-k">
+    <div class="card-head">
+      <div class="card-head-top">
+        <span class="qnum ">P05</span>
+        <span class="difficulty med">Medium</span>
+        
+        <span class="bonus-tag" style="color:var(--teal);border-color:var(--teal-dim)">Your solution</span>
+        <a class="card-link" href="https://leetcode.com/problems/maximum-size-subarray-sum-equals-k/" target="_blank" rel="noopener">https://leetcode.com/problems/maximum-size-subarray-sum-equals-k/</a>
+      </div>
+      <h3 class="card-title" contenteditable="true">Maximum Size Subarray Sum Equals K</h3>
+      <p class="card-prompt" contenteditable="true">Given an integer array <code>nums</code> and an integer <code>k</code>, return the <code>maximum length</code> of a contiguous subarray whose sum equals k. Return 0 if none exists.</p>
+    </div>
+    <div class="card-body">
+      <div class="section-label">Sample Input / Output</div>
+      <div class="io-pair">
+        <div class="io-block"><h4>Input</h4><div class="val" contenteditable="true">nums = [1, -1, 5, -2, 3], k = 3</div></div>
+        <div class="io-block"><h4>Output</h4><div class="val" contenteditable="true">4   (subarray [1, -1, 5, -2])</div></div>
+      </div>
+      <details class="solution">
+        <summary><span class="prompt-txt">#</span> <span class="exec">Reveal approach &amp; solution</span> <span class="prompt-txt">(try it yourself first)</span></summary>
+        <div class="solution-inner">
+          <p class="approach" contenteditable="true"><b>Approach:</b> Same prefix-sum idea but now we want the longest match, not the count. Store only the first index of each prefix sum (seed {0: -1}). If prefix_sum - k exists, the length is i - mp[prefix_sum - k].</p>
+          <pre><code contenteditable="true"><span class="com"># Given an array of integers nums and an integer k, return the maximum length of a contiguous subarray whose sum equals k.</span>
+<span class="com"># If no such subarray exists, return 0.</span>
+
+nums = [<span class="num">1</span>, -<span class="num">1</span>, <span class="num">5</span>, -<span class="num">2</span>, <span class="num">3</span>]
+k = <span class="num">3</span>
+
+mp = {<span class="num">0</span>: -<span class="num">1</span>}  <span class="com"># prefix sum 0 first seen at index -1 (before array starts)</span>
+prefix_sum = <span class="num">0</span>
+ans = <span class="num">0</span>
+
+<span class="kw">for</span> i <span class="kw">in</span> range(len(nums)):
+    prefix_sum += nums[i]
+
+    <span class="com"># If (prefix_sum - k) was seen before, subarray from that index+1 to i sums to k</span>
+    <span class="kw">if</span> prefix_sum - k <span class="kw">in</span> mp:
+        ans = max(ans, i - mp[prefix_sum - k])
+
+    <span class="com"># Store first occurrence only (earliest index gives max length)</span>
+    <span class="kw">if</span> prefix_sum <span class="kw">not</span> <span class="kw">in</span> mp:
+        mp[prefix_sum] = i
+
+print(ans)</code></pre>
+          <div class="de-angle" contenteditable="true"><b>DE interview angle:</b> Follow-up: contrast it with the counting version out loud. Counting stores frequencies and is seeded with {0: 1}; max-length stores first indices and is seeded with {0: -1}. Interviewers often probe exactly this distinction.</div>
+        </div>
+      </details>
+    </div></div><div class="card" id="p-continuous-subarray-sum">
+    <div class="card-head">
+      <div class="card-head-top">
+        <span class="qnum ">P06</span>
+        <span class="difficulty med">Medium</span>
+        
+        <span class="bonus-tag" style="color:var(--teal);border-color:var(--teal-dim)">Your solution</span>
+        <a class="card-link" href="https://leetcode.com/problems/continuous-subarray-sum/" target="_blank" rel="noopener">https://leetcode.com/problems/continuous-subarray-sum/</a>
+      </div>
+      <h3 class="card-title" contenteditable="true">Continuous Subarray Sum</h3>
+      <p class="card-prompt" contenteditable="true">Return true if <code>nums</code> has a subarray of <code>length at least 2</code> whose sum is a multiple of k, otherwise false.</p>
+    </div>
+    <div class="card-body">
+      <div class="section-label">Sample Input / Output</div>
+      <div class="io-pair">
+        <div class="io-block"><h4>Input</h4><div class="val" contenteditable="true">nums = [23, 2, 4, 6, 7], k = 6</div></div>
+        <div class="io-block"><h4>Output</h4><div class="val" contenteditable="true">true   ([2, 4] sums to 6)</div></div>
+      </div>
+      <details class="solution">
+        <summary><span class="prompt-txt">#</span> <span class="exec">Reveal approach &amp; solution</span> <span class="prompt-txt">(try it yourself first)</span></summary>
+        <div class="solution-inner">
+          <p class="approach" contenteditable="true"><b>Approach:</b> Store the first index of each prefix_sum % k. If the same remainder appears again at least 2 indices later, the elements in between sum to a multiple of k. A remainder of 0 at i &gt;= 1 means the whole prefix qualifies on its own.</p>
+          <pre><code contenteditable="true"><span class="com"># Given an integer array nums and an integer k, return true if nums has a good subarray or false otherwise.</span>
+
+<span class="com"># A good subarray is a subarray where:</span>
+
+<span class="com"># its length is at least two, and</span>
+<span class="com"># the sum of the elements of the subarray is a multiple of k.</span>
+<span class="com"># Note that:</span>
+
+<span class="com"># A subarray is a contiguous part of the array.</span>
+<span class="com"># An integer x is a multiple of k if there exists an integer n such that x = n * k. 0 is always a multiple of k.</span>
+
+
+<span class="com"># Example 1:</span>
+
+<span class="com"># Input: nums = [23,2,4,6,7], k = 6</span>
+<span class="com"># Output: true</span>
+<span class="com"># Explanation: [2, 4] is a continuous subarray of size 2 whose elements sum up to 6.</span>
+
+<span class="kw">def</span> checkSubarraySum(self, nums: List[int], k: int) -&gt; bool:
+    ans = <span class="kw">False</span>
+    prefix_sum = <span class="num">0</span>
+    mp = {}
+    <span class="kw">for</span> i <span class="kw">in</span> range(len(nums)):
+        prefix_sum += nums[i]
+        rem = prefix_sum % k
+
+        <span class="kw">if</span> rem == <span class="num">0</span> <span class="kw">and</span> i &gt;= <span class="num">1</span>:
+            <span class="kw">return</span> <span class="kw">True</span>
+
+        <span class="kw">if</span> rem <span class="kw">in</span> mp:
+            <span class="kw">if</span> i - mp[rem] &gt;= <span class="num">2</span>:
+                <span class="kw">return</span>  <span class="kw">True</span>
+        <span class="kw">else</span>:
+            mp[rem] = i
+
+    <span class="kw">return</span>(ans)</code></pre>
+          <div class="de-angle" contenteditable="true"><b>DE interview angle:</b> Follow-up: why store only the first index? Because the first occurrence gives the widest gap, so one comparison decides it. Edge case to mention: LeetCode guarantees k &gt;= 1 here; with k = 0 the modulo would fail and you would need a separate branch.</div>
+        </div>
+      </details>
+    </div></div></div>
+
+<footer>
+  <span class="blink">$</span> tip — both patterns are O(n) single passes, which is exactly why they map well to Spark: Kadane-style and prefix-sum logic become window functions (sum over rows unbounded preceding) or a distributed scan with per-partition partial results that are merged.
+</footer>
+
+<script>
+const problems = [
+// ======================= KADANE =======================
+{
+  topic: "kadane", id: "k-max-subarray", difficulty: "med", bonus: false,
+  title: "Maximum Subarray Sum",
+  link: "https://leetcode.com/problems/maximum-subarray/",
+  prompt: `Given an integer array, find the contiguous subarray (at least one element) with the <code>largest sum</code> and return that sum.`,
+  input: `nums = [-2, 1, -3, 4, -1, 2, 1, -5, 4]`,
+  output: `6   (subarray [4, -1, 2, 1])`,
+  approach: `Kadane's algorithm. At each element, the best subarray ending here is either the element alone or the previous best plus this element. Keep a global best. O(n) time, O(1) space. The second function shows how to also return the subarray boundaries.`,
+  solution: `def max_subarray(nums):
+    cur = best = nums[0]
+    for x in nums[1:]:
+        cur = max(x, cur + x)
+        best = max(best, cur)
+    return best
+
+
+# variant: also return the subarray indices
+def max_subarray_with_indices(nums):
+    cur = best = nums[0]
+    start = best_start = best_end = 0
+    for i in range(1, len(nums)):
+        if nums[i] > cur + nums[i]:
+            cur = nums[i]
+            start = i
+        else:
+            cur += nums[i]
+        if cur > best:
+            best = cur
+            best_start, best_end = start, i
+    return best, best_start, best_end`,
+  deAngle: `Follow-up: "do this over a stream or a partitioned dataset." Each partition keeps (total, best prefix, best suffix, best subarray), and these four values merge associatively, so it parallelises as a reduce.`
+},
+{
+  topic: "kadane", id: "k-min-subarray", difficulty: "easy", bonus: false,
+  title: "Minimum Subarray Sum",
+  link: "https://www.geeksforgeeks.org/problems/smallest-sum-contiguous-subarray/1",
+  prompt: `Given an integer array, find the contiguous subarray with the <code>smallest sum</code> and return that sum.`,
+  input: `arr = [3, -4, 2, -3, -1, 7, -5]`,
+  output: `-6   (subarray [-4, 2, -3, -1])`,
+  approach: `Mirror image of Kadane: replace max with min. The best subarray ending here is the element alone or the previous minimum plus this element.`,
+  solution: `def min_subarray(arr):
+    cur = best = arr[0]
+    for x in arr[1:]:
+        cur = min(x, cur + x)
+        best = min(best, cur)
+    return best`,
+  deAngle: `Follow-up: where would you use it? Finding the worst drawdown or the worst consecutive stretch in a daily net-change series. It is also the building block for the circular and absolute-sum variants below.`
+},
+{
+  topic: "kadane", id: "k-max-product", difficulty: "med", bonus: false,
+  title: "Maximum Product Subarray",
+  link: "https://leetcode.com/problems/maximum-product-subarray/",
+  prompt: `Given an integer array, find the contiguous subarray with the <code>largest product</code> and return that product.`,
+  input: `nums = [2, 3, -2, 4]   and   nums = [-2, 0, -1]`,
+  output: `6   and   0`,
+  approach: `A negative number can turn the smallest product into the largest, so track both the max and the min product ending at each index. For each x, the candidates are x alone, cur_max * x, and cur_min * x. A zero naturally resets both trackers because the lone-x candidate wins.`,
+  solution: `def max_product(nums):
+    cur_max = cur_min = best = nums[0]
+    for x in nums[1:]:
+        candidates = (x, cur_max * x, cur_min * x)
+        cur_max, cur_min = max(candidates), min(candidates)
+        best = max(best, cur_max)
+    return best`,
+  deAngle: `Follow-up: "why not just track the max?" Because of sign flips, shown with [-2, 3, -4]. In the data world, products show up as compounding growth rates or cumulative probabilities (often handled with logs to avoid overflow).`
+},
+{
+  topic: "kadane", id: "k-one-deletion", difficulty: "med", bonus: false,
+  title: "Maximum Subarray Sum with One Deletion",
+  link: "https://leetcode.com/problems/maximum-subarray-sum-with-one-deletion/description/",
+  prompt: `Return the maximum sum of a non-empty subarray after <code>optionally deleting at most one element</code> from it (the result must still be non-empty).`,
+  input: `arr = [1, -2, 0, 3]   and   arr = [-1, -1, -1, -1]`,
+  output: `4   (drop -2, giving [1, 0, 3])   and   -1`,
+  approach: `Two states per index. no_del = best subarray ending here with nothing deleted (plain Kadane). one_del = best ending here with exactly one deletion: either we delete the current element (take the previous no_del) or we keep it and extend an earlier deletion (one_del + x). The answer is the best of both states across the array.`,
+  solution: `def maximum_sum(arr):
+    no_del = best = arr[0]
+    one_del = float('-inf')
+    for x in arr[1:]:
+        one_del = max(one_del + x, no_del)   # keep x after a deletion, or delete x itself
+        no_del = max(no_del + x, x)          # plain Kadane
+        best = max(best, no_del, one_del)
+    return best`,
+  deAngle: `Follow-up: "what if you could delete k elements?" That becomes a DP with a state per number of deletions used: O(n * k). Naming the generalisation shows you see the pattern as DP, not a trick.`
+},
+{
+  topic: "kadane", id: "k-max-absolute-sum", difficulty: "med", bonus: false,
+  title: "Maximum Absolute Sum of Any Subarray",
+  link: "https://leetcode.com/problems/maximum-absolute-sum-of-any-subarray/",
+  prompt: `Return the maximum <code>absolute value</code> of the sum of any subarray. An empty subarray (sum 0) is allowed.`,
+  input: `nums = [1, -3, 2, 3, -4]   and   nums = [2, -5, 1, -4, 3, -2]`,
+  output: `5   and   8`,
+  approach: `The largest absolute sum is either the largest positive subarray sum or the most negative one, so run max-Kadane and min-Kadane together. Clamping at 0 (cur_max never below 0, cur_min never above 0) handles the allowed empty subarray.`,
+  solution: `def max_absolute_sum(nums):
+    cur_max = cur_min = best = 0
+    for x in nums:
+        cur_max = max(0, cur_max + x)
+        cur_min = min(0, cur_min + x)
+        best = max(best, cur_max, -cur_min)
+    return best`,
+  deAngle: `Follow-up: equivalent to max(prefix) - min(prefix) over the prefix sums, which is a great one-line alternative to mention. In analytics terms, the largest swing in a running balance.`
+},
+{
+  topic: "kadane", id: "k-circular", difficulty: "med", bonus: false,
+  title: "Maximum Sum in Circular Array",
+  link: "https://leetcode.com/problems/maximum-sum-circular-subarray/",
+  prompt: `Given a circular integer array, return the <code>maximum sum</code> of a non-empty subarray, where the subarray may wrap around the end.`,
+  input: `nums = [5, -3, 5]   and   nums = [-3, -2, -3]`,
+  output: `10   (wraps: 5 + 5)   and   -2`,
+  approach: `Two cases. (1) The best subarray does not wrap: plain Kadane max. (2) It wraps: then the elements left out form a contiguous minimum subarray, so the answer is total - min_subarray. Take the larger. Edge case: if the plain max is negative, all elements are negative and case 2 would pick an empty set, so return the plain max.`,
+  solution: `def max_subarray_circular(nums):
+    total = 0
+    cur_max = cur_min = 0
+    best_max = float('-inf')
+    best_min = float('inf')
+    for x in nums:
+        total += x
+        cur_max = max(x, cur_max + x)
+        best_max = max(best_max, cur_max)
+        cur_min = min(x, cur_min + x)
+        best_min = min(best_min, cur_min)
+    if best_max < 0:
+        return best_max
+    return max(best_max, total - best_min)`,
+  deAngle: `Follow-up: "why does total - min work?" The wrap-around segment is the complement of a contiguous middle block, so maximising the wrap means minimising what you leave out. Stating that complement argument clearly is the senior-level signal here.`
+},
+{
+  topic: "kadane", id: "k-stock", difficulty: "easy", bonus: true,
+  title: "Best Time to Buy and Sell Stock",
+  link: "https://leetcode.com/problems/best-time-to-buy-and-sell-stock/",
+  prompt: `Given daily prices, return the <code>maximum profit</code> from one buy followed by one sell, or 0 if no profit is possible.`,
+  input: `prices = [7, 1, 5, 3, 6, 4]`,
+  output: `5   (buy at 1, sell at 6)`,
+  approach: `Kadane in disguise: it is the maximum subarray sum of the day-to-day price differences. The usual implementation tracks the lowest price so far and the best profit from selling today.`,
+  solution: `def max_profit(prices):
+    min_price = float('inf')
+    best = 0
+    for p in prices:
+        min_price = min(min_price, p)
+        best = max(best, p - min_price)
+    return best`,
+  deAngle: `Bonus: spotting that this equals Kadane on the diff array is a nice pattern-recognition moment. Connect it to a window function: max(price - min(price) over (order by day rows unbounded preceding)).`
+},
+// ======================= PREFIX SUM (user's notebook solutions, verbatim) =======================
+{
+  topic: "prefix", id: "p-subarray-sum-k", difficulty: "med", bonus: false,
+  title: "Subarray Sum Equals K",
+  link: "https://leetcode.com/problems/subarray-sum-equals-k/",
+  prompt: `Given an integer array <code>nums</code> and an integer <code>k</code>, return the total number of subarrays whose sum equals k.`,
+  input: `nums = [1, 2, 3], k = 3`,
+  output: `2   ([1, 2] and [3])`,
+  approach: `Prefix sum with a dict of counts, seeded with {0: 1} (the empty prefix). If prefix_sum - k was seen before, each earlier occurrence marks a valid subarray ending at i. Then record the current prefix_sum.`,
+  solution: `# Subarray Sum Equals K
+# Given an array of integers nums and an integer k, return the total number of subarrays whose sum equals to k.
+# nums = [1,2,3]
+# k = 3
+nums = [1]
+k = 0
+mp = {0: 1}  # prefix sum 0 seen once (empty prefix)
+
+prefix_sum = 0
+ans = 0
+for i in range(len(nums)):
+    prefix_sum += nums[i]
+
+    if prefix_sum - k in mp:
+        ans += mp[prefix_sum - k]
+    if prefix_sum in mp:
+        mp[prefix_sum] += 1
+    else:
+        mp[prefix_sum] = 1
+
+print(ans)`,
+  deAngle: `Follow-up: "why not sliding window?" Negatives break the monotonic grow/shrink logic, while prefix sums do not care about sign. In Spark/SQL terms, this is a self-join on running totals (prefix = prefix_prev + k).`
+},
+{
+  topic: "prefix", id: "p-divisible-by-k", difficulty: "med", bonus: false,
+  title: "Subarray Sums Divisible by K",
+  link: "https://leetcode.com/problems/subarray-sums-divisible-by-k/",
+  prompt: `Given an integer array <code>nums</code> and an integer <code>k</code>, return the number of non-empty subarrays whose sum is <code>divisible by k</code>.`,
+  input: `nums = [4, 5, 0, -2, -3, 1], k = 5`,
+  output: `7`,
+  approach: `Store counts of prefix_sum % k. Two equal remainders mean the subarray between them sums to a multiple of k. Seed with {0: 1}. Python's % is non-negative for negative numbers, so negatives need no special handling.`,
+  solution: `# Given an integer array nums and an integer k, return the number of non-empty subarrays that have a sum divisible by k.
+
+# A subarray is a contiguous part of an array.
+
+# Example 1:
+
+# Input: nums = [4,5,0,-2,-3,1], k = 5
+# Output: 7
+# Explanation: There are 7 subarrays with a sum divisible by k = 5:
+# [4, 5, 0, -2, -3, 1], [5], [5, 0], [5, 0, -2, -3], [0], [0, -2, -3], [-2, -3]
+
+def subarraysDivByK(self, nums: List[int], k: int) -> int:
+    mp = {0: 1}
+    prefix_sum = 0
+    ans = 0
+
+    for num in nums:
+        prefix_sum += num
+
+        if (prefix_sum % k) in mp:
+            ans += mp[prefix_sum % k]
+
+        if (prefix_sum % k) not in mp:
+            mp[(prefix_sum % k)] = 1
+        else:
+            mp[(prefix_sum % k)]+=1
+
+
+    return(ans)`,
+  deAngle: `Follow-up: the key is the pigeonhole insight: there are only k possible remainders, so space is O(k), not O(n). That bounded-state view is useful when the data is too large to hold every distinct prefix.`
+},
+{
+  topic: "prefix", id: "p-binary-subarrays", difficulty: "med", bonus: false,
+  title: "Binary Subarrays With Sum",
+  link: "https://leetcode.com/problems/binary-subarrays-with-sum/",
+  prompt: `Given a binary array <code>nums</code> and an integer <code>goal</code>, return the number of non-empty subarrays whose sum equals goal.`,
+  input: `nums = [1, 0, 1, 0, 1], goal = 2`,
+  output: `4`,
+  approach: `Exactly the Subarray Sum Equals K pattern with goal in place of k. Count how many times prefix_sum - goal has appeared. Handles the all-zeros case (goal = 0) correctly because of the {0: 1} seed.`,
+  solution: `# Given a binary array nums and an integer goal, return the number of non-empty subarrays with a sum goal.
+
+# A subarray is a contiguous part of the array.
+nums = [0,0,0,0,0]
+goal = 0
+
+mp = {0: 1}
+prefix_sum = 0
+ans = 0
+for i in range(len(nums)):
+    prefix_sum += nums[i]
+
+    if prefix_sum - goal in mp:
+        ans += mp[prefix_sum - goal]
+
+    if prefix_sum in mp:
+        mp[prefix_sum] += 1
+    else:
+        mp[prefix_sum] = 1
+
+print(ans)`,
+  deAngle: `Follow-up: because values are only 0/1, a sliding-window "at most goal minus at most goal-1" solution also works in O(1) space. Mention it as the alternative and say why prefix sums generalise better (they survive negatives).`
+},
+{
+  topic: "prefix", id: "p-contiguous-array", difficulty: "med", bonus: false,
+  title: "Contiguous Array",
+  link: "https://leetcode.com/problems/contiguous-array/",
+  prompt: `Given a binary array <code>nums</code>, return the <code>maximum length</code> of a contiguous subarray with an equal number of 0s and 1s.`,
+  input: `nums = [0, 1, 0]`,
+  output: `2   ([0, 1] or [1, 0])`,
+  approach: `Treat 0 as -1 and 1 as +1. Equal counts means the running sum returns to a value seen before. Solution 1 stores the first index of each prefix sum with a {0: -1} seed and never overwrites it, since the earliest index gives the longest subarray. Solution 2 skips the seed and instead handles the case where the prefix sum itself equals the target (0) by setting ans = i + 1, which covers subarrays starting at index 0.`,
+  solution: `# ---------- Solution 1: seed the map with {0: -1} ----------
+# Given a binary array nums, return the maximum length of a contiguous subarray with an equal number of 0 and 1.
+nums = [0, 1]
+
+mp = {0: -1}  # prefix sum 0 first seen at index -1 (before array starts)
+prefix_sum = 0
+ans = 0
+
+for i in range(len(nums)):
+    # Treat 0 as -1, 1 as +1 so equal count means prefix_sum returns to a previous value
+    if nums[i] == 0:
+        prefix_sum -= 1
+    else:
+        prefix_sum += 1
+
+    if prefix_sum in mp:
+        ans = max(ans, i - mp[prefix_sum])
+    else:
+        mp[prefix_sum] = i
+
+print(ans)
+
+
+# ---------- Solution 2: no seed, handle prefix == target separately ----------
+def findMaxLength(self, nums: List[int]) -> int:
+    mp = {}
+    ans = 0
+    prefix_sum = 0
+    target = 0
+
+
+    for i in range(len(nums)):
+        if nums[i]==0:
+            prefix_sum -= 1
+        else:
+            prefix_sum += nums[i]
+
+        if prefix_sum == target:
+            ans = i+1
+        if prefix_sum-target in mp:
+            ans = max(ans,(i-mp[prefix_sum-target]))
+        if prefix_sum not in mp:
+            mp[prefix_sum] = i
+
+    return(ans)`,
+  deAngle: `Follow-up: the "map 0 to -1" transformation is the trick to name out loud. The same idea solves "equal number of two categories" problems, e.g. balanced success/failure windows in an event log. Be ready to explain why both solutions are equivalent: the {0: -1} seed in Solution 1 does the same job as the explicit prefix == 0 check in Solution 2.`
+},
+{
+  topic: "prefix", id: "p-max-length-sum-k", difficulty: "med", bonus: false,
+  title: "Maximum Size Subarray Sum Equals K",
+  link: "https://leetcode.com/problems/maximum-size-subarray-sum-equals-k/",
+  prompt: `Given an integer array <code>nums</code> and an integer <code>k</code>, return the <code>maximum length</code> of a contiguous subarray whose sum equals k. Return 0 if none exists.`,
+  input: `nums = [1, -1, 5, -2, 3], k = 3`,
+  output: `4   (subarray [1, -1, 5, -2])`,
+  approach: `Same prefix-sum idea but now we want the longest match, not the count. Store only the first index of each prefix sum (seed {0: -1}). If prefix_sum - k exists, the length is i - mp[prefix_sum - k].`,
+  solution: `# Given an array of integers nums and an integer k, return the maximum length of a contiguous subarray whose sum equals k.
+# If no such subarray exists, return 0.
+
+nums = [1, -1, 5, -2, 3]
+k = 3
+
+mp = {0: -1}  # prefix sum 0 first seen at index -1 (before array starts)
+prefix_sum = 0
+ans = 0
+
+for i in range(len(nums)):
+    prefix_sum += nums[i]
+
+    # If (prefix_sum - k) was seen before, subarray from that index+1 to i sums to k
+    if prefix_sum - k in mp:
+        ans = max(ans, i - mp[prefix_sum - k])
+
+    # Store first occurrence only (earliest index gives max length)
+    if prefix_sum not in mp:
+        mp[prefix_sum] = i
+
+print(ans)`,
+  deAngle: `Follow-up: contrast it with the counting version out loud. Counting stores frequencies and is seeded with {0: 1}; max-length stores first indices and is seeded with {0: -1}. Interviewers often probe exactly this distinction.`
+},
+{
+  topic: "prefix", id: "p-continuous-subarray-sum", difficulty: "med", bonus: false,
+  title: "Continuous Subarray Sum",
+  link: "https://leetcode.com/problems/continuous-subarray-sum/",
+  prompt: `Return true if <code>nums</code> has a subarray of <code>length at least 2</code> whose sum is a multiple of k, otherwise false.`,
+  input: `nums = [23, 2, 4, 6, 7], k = 6`,
+  output: `true   ([2, 4] sums to 6)`,
+  approach: `Store the first index of each prefix_sum % k. If the same remainder appears again at least 2 indices later, the elements in between sum to a multiple of k. A remainder of 0 at i >= 1 means the whole prefix qualifies on its own.`,
+  solution: `# Given an integer array nums and an integer k, return true if nums has a good subarray or false otherwise.
+
+# A good subarray is a subarray where:
+
+# its length is at least two, and
+# the sum of the elements of the subarray is a multiple of k.
+# Note that:
+
+# A subarray is a contiguous part of the array.
+# An integer x is a multiple of k if there exists an integer n such that x = n * k. 0 is always a multiple of k.
+
+
+# Example 1:
+
+# Input: nums = [23,2,4,6,7], k = 6
+# Output: true
+# Explanation: [2, 4] is a continuous subarray of size 2 whose elements sum up to 6.
+
+def checkSubarraySum(self, nums: List[int], k: int) -> bool:
+    ans = False
+    prefix_sum = 0
+    mp = {}
+    for i in range(len(nums)):
+        prefix_sum += nums[i]
+        rem = prefix_sum % k
+
+        if rem == 0 and i >= 1:
+            return True
+
+        if rem in mp:
+            if i - mp[rem] >= 2:
+                return  True
+        else:
+            mp[rem] = i
+
+    return(ans)`,
+  deAngle: `Follow-up: why store only the first index? Because the first occurrence gives the widest gap, so one comparison decides it. Edge case to mention: LeetCode guarantees k >= 1 here; with k = 0 the modulo would fail and you would need a separate branch.`
+}
+];
+
+// ---- tiny Python syntax highlighter ----
+function highlight(code){
+  const esc = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const re = /(#.*$)|("(?:[^"]|\\.)*"|'(?:[^']|\\.)*')|\b(def|class|return|for|in|if|elif|else|while|not|and|or|import|from|continue|break|None|True|False|is|lambda)\b|\b(\d+)\b/gm;
+  return esc.replace(re, (m, com, str, kw, num) => {
+    if (com) return '<span class="com">' + m + '</span>';
+    if (str) return '<span class="str">' + m + '</span>';
+    if (kw)  return '<span class="kw">' + m + '</span>';
+    if (num) return '<span class="num">' + m + '</span>';
+    return m;
+  });
+}
+
+const targets = {
+  kadane: { idx: document.getElementById('indexGridKadane'), stack: document.getElementById('stackKadane'), n: 0, prefix: 'K' },
+  prefix: { idx: document.getElementById('indexGridPrefix'), stack: document.getElementById('stackPrefix'), n: 0, prefix: 'P' }
+};
+
+problems.forEach((p) => {
+  const t = targets[p.topic];
+  t.n += 1;
+  const num = t.prefix + String(t.n).padStart(2, '0');
+  const diffLabel = p.difficulty === 'easy' ? 'Easy' : p.difficulty === 'med' ? 'Medium' : 'Hard';
+
+  const idxEl = document.createElement('a');
+  idxEl.href = '#' + p.id;
+  idxEl.className = 'index-item' + (p.bonus ? ' bonus' : '');
+  idxEl.innerHTML = '<span class="n">' + num + '</span> ' + p.title + (p.bonus ? ' ✦' : '');
+  t.idx.appendChild(idxEl);
+
+  const card = document.createElement('div');
+  card.className = 'card' + (p.bonus ? ' bonus' : '');
+  card.id = p.id;
+  card.innerHTML = `
+    <div class="card-head">
+      <div class="card-head-top">
+        <span class="qnum ${p.bonus ? 'bonus' : ''}">${num}</span>
+        <span class="difficulty ${p.difficulty}">${diffLabel}</span>
+        ${p.bonus ? '<span class="bonus-tag">Bonus addition</span>' : ''}
+        ${p.topic === 'prefix' ? '<span class="bonus-tag" style="color:var(--teal);border-color:var(--teal-dim)">Your solution</span>' : ''}
+        <a class="card-link" href="${p.link}" target="_blank" rel="noopener">${p.link}</a>
+      </div>
+      <h3 class="card-title" contenteditable="true">${p.title}</h3>
+      <p class="card-prompt" contenteditable="true">${p.prompt}</p>
+    </div>
+    <div class="card-body">
+      <div class="section-label">Sample Input / Output</div>
+      <div class="io-pair">
+        <div class="io-block"><h4>Input</h4><div class="val" contenteditable="true"></div></div>
+        <div class="io-block"><h4>Output</h4><div class="val" contenteditable="true"></div></div>
+      </div>
+      <details class="solution">
+        <summary><span class="prompt-txt">#</span> <span class="exec">Reveal approach &amp; solution</span> <span class="prompt-txt">(try it yourself first)</span></summary>
+        <div class="solution-inner">
+          <p class="approach" contenteditable="true"><b>Approach:</b> ${p.approach}</p>
+          <pre><code contenteditable="true">${highlight(p.solution)}</code></pre>
+          <div class="de-angle" contenteditable="true"><b>DE interview angle:</b> ${p.deAngle}</div>
+        </div>
+      </details>
+    </div>`;
+  const vals = card.querySelectorAll('.io-block .val');
+  vals[0].textContent = p.input;
+  vals[1].textContent = p.output;
+  t.stack.appendChild(card);
+});
+
+// --- Edit mode toggle ---
+const editBtn = document.getElementById('editToggle');
+let editing = false;
+editBtn.addEventListener('click', () => {
+  editing = !editing;
+  document.designMode = editing ? 'on' : 'off';
+  editBtn.textContent = editing ? '✅ Edit mode: on' : '✏️ Edit mode: off';
+  editBtn.classList.toggle('on', editing);
+});
+
+// --- Download edited copy ---
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  if (editing) { document.designMode = 'off'; editBtn.textContent = '✏️ Edit mode: off'; editBtn.classList.remove('on'); editing = false; }
+  const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'kadane_prefix_sum_prep_edited.html';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+</script>
+
+
+</body></html>
